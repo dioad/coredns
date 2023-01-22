@@ -58,6 +58,26 @@ func TestHostPortOrFile(t *testing.T) {
 			"",
 			true,
 		},
+                {
+                	"https://doh.example.com",
+                	"https://doh.example.com:443",
+                	false,
+                },
+                {
+                	"https://doh.example.com:1234",
+                	"https://doh.example.com:1234",
+                	false,
+                },
+                {
+                	"tls://doh.example.com",
+                	"tls://doh.example.com:853",
+                	false,
+                },
+                {
+                	"tls://doh.example.com:2345",
+                	"tls://doh.example.com:2345",
+                	false,
+                },
 	}
 
 	err := os.WriteFile("resolv.conf", []byte("nameserver 127.0.0.1\n"), 0600)

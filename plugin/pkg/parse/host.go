@@ -39,14 +39,18 @@ func HostPortOrFile(s ...string) ([]string, error) {
 		if err != nil {
 			// Parse didn't work, it is not a addr:port combo
 			hostNoZone := stripZone(host)
+
 			if net.ParseIP(hostNoZone) == nil {
 				ss, err := tryFile(host)
 				if err == nil {
 					servers = append(servers, ss...)
 					continue
 				}
-				return servers, fmt.Errorf("not an IP address or file: %q", host)
+				if trans != transport.TLS && trans != transport.HTTPS {
+					return servers, fmt.Errorf("not an IP address or file: %q", host)
+				}
 			}
+
 			var ss string
 			switch trans {
 			case transport.DNS:
@@ -68,7 +72,10 @@ func HostPortOrFile(s ...string) ([]string, error) {
 				servers = append(servers, ss...)
 				continue
 			}
-			return servers, fmt.Errorf("not an IP address or file: %q", host)
+			if trans != transport.TLS && trans != transport.HTTPS {
+				return servers, fmt.Errorf("not an IP address or file: %q", host)
+			}
+
 		}
 		servers = append(servers, h)
 	}
