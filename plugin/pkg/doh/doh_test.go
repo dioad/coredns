@@ -12,12 +12,13 @@ func TestDoH(t *testing.T) {
 		method string
 		url    string
 	}{
-		"POST request over HTTPS":       {method: http.MethodPost, url: "https://example.org:443"},
-		"POST request over HTTP":        {method: http.MethodPost, url: "http://example.org:443"},
-		"POST request without protocol": {method: http.MethodPost, url: "example.org:443"},
-		"GET request over HTTPS":        {method: http.MethodGet, url: "https://example.org:443"},
-		"GET request over HTTP":         {method: http.MethodGet, url: "http://example.org"},
-		"GET request without protocol":  {method: http.MethodGet, url: "example.org:443"},
+		"POST request over HTTPS":                {method: http.MethodPost, url: "https://example.org:443"},
+		"POST request over HTTP":                 {method: http.MethodPost, url: "http://example.org:443"},
+		"POST request without protocol":          {method: http.MethodPost, url: "example.org:443"},
+		"POST request without protocol and port": {method: http.MethodPost, url: "example.org"},
+		"GET request over HTTPS":                 {method: http.MethodGet, url: "https://example.org:443"},
+		"GET request over HTTP":                  {method: http.MethodGet, url: "http://example.org"},
+		"GET request without protocol":           {method: http.MethodGet, url: "example.org:443"},
 	}
 
 	for name, test := range tests {
