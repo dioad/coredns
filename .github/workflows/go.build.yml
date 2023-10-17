@@ -33,6 +33,9 @@ jobs:
           GIT_TRACE: 1
         run: |
           git config -l --global
+          go version
+          $GOPATH/bin/go version
+          $GOPATH/bin/go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
           $GOPATH/bin/go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
           $GOPATH/bin/go get -v -t -d ./...
 
