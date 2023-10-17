@@ -107,10 +107,10 @@ github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 h1:tdlZCpZ/P9DhczC
 github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
 github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi/U=
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
-github.com/dioad/connect-control v0.24.0 h1:/lvTtpaHe1d2Nvro24eh8WfvEFwQOCyhd6M3/TP5xA4=
-github.com/dioad/connect-control v0.24.0/go.mod h1:69n0dg2uwjw63drc3rCcs72xh0XR6dt1jNfSISr2020=
-github.com/dioad/coredns-dioadconnect v0.4.7 h1:Z2/6gi6PeFd3RimjiBF7kLnRT7v2gVpBdICIqLEC0gk=
-github.com/dioad/coredns-dioadconnect v0.4.7/go.mod h1:0pZrhop1Avn5AMg1QRSa3hx10EG0Sd1iRImBZE4Wx6U=
+github.com/dioad/connect-control v0.25.0 h1:Q523hupH2sCbk8ngHZmIYyKPBVVcjOxsXzyIxrAHOCQ=
+github.com/dioad/connect-control v0.25.0/go.mod h1:69n0dg2uwjw63drc3rCcs72xh0XR6dt1jNfSISr2020=
+github.com/dioad/coredns-dioadconnect v0.5.0 h1:WakqIneGvlvOMPL0PGe/CbY7dSTCuJnZGTu77jTEm2k=
+github.com/dioad/coredns-dioadconnect v0.5.0/go.mod h1:79AkVEZkDabHENRaO1WVEf7JrqFkFs9g0nQwaWPJqXQ=
 github.com/dioad/net v0.31.0 h1:DDkzPgu8/YQYY3Xvkx7k1grdzm2BY1uG08f2GY8H4Zw=
 github.com/dioad/net v0.31.0/go.mod h1:1aJFUdLmjk8dfNzK2iFZeA0+Bf+qivh7/08GYOsIHXI=
 github.com/dnstap/golang-dnstap v0.4.0 h1:KRHBoURygdGtBjDI2w4HifJfMAhhOqDuktAokaSa234=
