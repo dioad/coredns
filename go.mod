@@ -12,7 +12,7 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/aws/aws-sdk-go v1.45.25
 	github.com/coredns/caddy v1.1.1
-	github.com/dioad/coredns-dioadconnect v0.4.7
+	github.com/dioad/coredns-dioadconnect v0.5.0
 	github.com/dnstap/golang-dnstap v0.4.0
 	github.com/farsightsec/golang-framestream v0.3.0
 	github.com/go-logr/logr v1.2.4
@@ -67,7 +67,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/dioad/connect-control v0.24.0 // indirect
+	github.com/dioad/connect-control v0.25.0 // indirect
 	github.com/dioad/net v0.31.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.5.0-alpha.1 // indirect
