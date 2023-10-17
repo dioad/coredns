@@ -33,21 +33,19 @@ jobs:
           GIT_TRACE: 1
         run: |
           git config -l --global
-          go version
-          $GOPATH/bin/go version
-          $GOPATH/bin/go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
-          $GOPATH/bin/go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
-          $GOPATH/bin/go get -v -t -d ./...
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+          go get -v -t -d ./...
 
       - name: Generate
         run: |
-          $GOPATH/bin/go generate coredns.go
+          go generate coredns.go
         env:
           CI: false
 
       - name: Vet
         run: |
-          $GOPATH/bin/go vet ./...
+          go vet ./...
 
   build:
     name: Build
@@ -91,13 +89,13 @@ jobs:
       - name: Get dependencies
         run: |
           git config -l --global
-          $GOPATH/bin/go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
-          $GOPATH/bin/go get -v -t -d ./...
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+          go get -v -t -d ./...
 
       - name: Build
         run: |
-          GOOS= GOARCH= $GOPATH/bin/go generate coredns.go
-          $GOPATH/bin/go build -o ${{ env.OUTPUT_BINARY }} -v .
+          GOOS= GOARCH= go generate coredns.go
+          go build -o ${{ env.OUTPUT_BINARY }} -v .
           zip ${{ env.OUTPUT_ZIP }} ${{ env.OUTPUT_BINARY }}
         env:
           CI: false
