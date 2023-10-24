@@ -81,8 +81,8 @@ github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
 github.com/dioad/connect-control v0.26.0 h1:WVVgLpAZy0vuvXBH4llC3hfEjmT/2n2phwfwgFjEH+M=
 github.com/dioad/connect-control v0.26.0/go.mod h1:V3D/694PsiSnpz/0/k31PSp0gaNerLvvMljYoufLbM4=
-github.com/dioad/coredns-dioadconnect v0.5.1 h1:OFQjEkkvKuVQ4P4JUQkdtcln/ZhcT90eAfvGV7+Xj+4=
-github.com/dioad/coredns-dioadconnect v0.5.1/go.mod h1:vCaCvLFRrEVe/Em+BR9hdVzAMYCfa/vLhoChPHHen8M=
+github.com/dioad/coredns-dioadconnect v0.5.2 h1:EEc94sAvCe3pF5w3Ii7y9usuCE7+vwr0lZrwnpPPFHw=
+github.com/dioad/coredns-dioadconnect v0.5.2/go.mod h1:vCaCvLFRrEVe/Em+BR9hdVzAMYCfa/vLhoChPHHen8M=
 github.com/dioad/net v0.32.0 h1:iwtTTAt7VxZu8wD07CpirDov5D3B5yhH2MuO5ExVM4A=
 github.com/dioad/net v0.32.0/go.mod h1:1aJFUdLmjk8dfNzK2iFZeA0+Bf+qivh7/08GYOsIHXI=
 github.com/dnstap/golang-dnstap v0.4.0 h1:KRHBoURygdGtBjDI2w4HifJfMAhhOqDuktAokaSa234=

@@ -12,7 +12,7 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/aws/aws-sdk-go v1.45.25
 	github.com/coredns/caddy v1.1.1
-	github.com/dioad/coredns-dioadconnect v0.5.1
+	github.com/dioad/coredns-dioadconnect v0.5.2
 	github.com/dnstap/golang-dnstap v0.4.0
 	github.com/farsightsec/golang-framestream v0.3.0
 	github.com/go-logr/logr v1.2.4
