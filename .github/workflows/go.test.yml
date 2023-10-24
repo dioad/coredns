@@ -20,6 +20,17 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
+      - name: Configure github token
+        env:
+          TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
+          TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Get dependencies
+        run: |
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+
       - name: Build
         run: go build -v ./...
 
@@ -45,6 +56,17 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
+      - name: Configure github token
+        env:
+          TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
+          TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Get dependencies
+        run: |
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+
       - name: Build
         run: go build -v ./...
 
@@ -63,6 +85,17 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
+
+      - name: Configure github token
+        env:
+          TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
+          TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Get dependencies
+        run: |
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
 
       - name: Build
         run: go build -v ./...
