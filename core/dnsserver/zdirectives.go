@@ -43,6 +43,7 @@ var Directives = []string{
 	"dnssec",
 	"autopath",
 	"minimal",
+	"dioadconnect",
 	"template",
 	"transfer",
 	"hosts",
