@@ -94,6 +94,8 @@ github.com/dioad/coredns-dioadconnect v0.8.0 h1:uFx3EkuHdonTTpmQf80zBLcIyMiz4fey
 github.com/dioad/coredns-dioadconnect v0.8.0/go.mod h1:7I2pLyXIxGW/BGtM8SR6TE+UftztgwgHg/3S8+Ri1kU=
 github.com/dioad/coredns-dioadconnect v0.8.1 h1:mcKcZHLywNoL/5v2lJM1Tr9s1BF5mRnQQWoZFG0tXmA=
 github.com/dioad/coredns-dioadconnect v0.8.1/go.mod h1:YOITexobUg2vcSeJNK8CVlxPks8F09Gc/xCLZWb4PfI=
+github.com/dioad/coredns-dioadconnect v0.8.2 h1:+NrTulKR9qjbcjZPdCTxrPrnJsyYQh0FKGQQZ0/1kBs=
+github.com/dioad/coredns-dioadconnect v0.8.2/go.mod h1:YOITexobUg2vcSeJNK8CVlxPks8F09Gc/xCLZWb4PfI=
 github.com/dioad/net v0.34.1 h1:W6zv0Gcn29r8moV9mU7NunaDb+JuG0ENX/kv1mr9F0E=
 github.com/dioad/net v0.34.1/go.mod h1:s3xerJM9rI+0m4SxDpCFVuhXXUPoI2c/KavnsxYk+Rg=
 github.com/dioad/net v0.35.0 h1:g2j/XVOIcGFhlyF/ZuHfPjwsBhuMm/lHO8sqgWgbw9k=
