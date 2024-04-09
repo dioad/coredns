@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.28.5
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.5
 	github.com/coredns/caddy v1.1.2-0.20241029205200-8de985351a98
-	github.com/dioad/coredns-dioadconnect v0.7.0
+	github.com/dioad/coredns-dioadconnect v0.8.0
 	github.com/dnstap/golang-dnstap v0.4.0
 	github.com/expr-lang/expr v1.16.9
 	github.com/farsightsec/golang-framestream v0.3.0
@@ -83,7 +83,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dioad/connect-control v0.27.16 // indirect
-	github.com/dioad/net v0.34.1 // indirect
+	github.com/dioad/net v0.35.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
 	github.com/ebitengine/purego v0.6.0-alpha.5 // indirect
