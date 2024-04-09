@@ -109,10 +109,10 @@ github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
 github.com/dioad/connect-control v0.27.16 h1:RN5BvM4DBq+B3QaMBbsLD/ACmKJ+IfMTFTEr9Qw5pTI=
 github.com/dioad/connect-control v0.27.16/go.mod h1:hFdLdRAgbknKTNXO5+lkLJLhy1FkpCtBIqro0vswdgI=
-github.com/dioad/coredns-dioadconnect v0.8.0 h1:uFx3EkuHdonTTpmQf80zBLcIyMiz4feyWFSjyqdtGC0=
-github.com/dioad/coredns-dioadconnect v0.8.0/go.mod h1:7I2pLyXIxGW/BGtM8SR6TE+UftztgwgHg/3S8+Ri1kU=
-github.com/dioad/net v0.35.0 h1:g2j/XVOIcGFhlyF/ZuHfPjwsBhuMm/lHO8sqgWgbw9k=
-github.com/dioad/net v0.35.0/go.mod h1:Uo3c6ujmZWFTWoMxriMrO2x0lJXW2Mebt5gD73q4dxU=
+github.com/dioad/coredns-dioadconnect v0.8.1 h1:mcKcZHLywNoL/5v2lJM1Tr9s1BF5mRnQQWoZFG0tXmA=
+github.com/dioad/coredns-dioadconnect v0.8.1/go.mod h1:YOITexobUg2vcSeJNK8CVlxPks8F09Gc/xCLZWb4PfI=
+github.com/dioad/net v0.35.1 h1:IRIJ0GdGp2zM44HuylKE5vMlHJuP7t9verei5sgMMlM=
+github.com/dioad/net v0.35.1/go.mod h1:Uo3c6ujmZWFTWoMxriMrO2x0lJXW2Mebt5gD73q4dxU=
 github.com/dnstap/golang-dnstap v0.4.0 h1:KRHBoURygdGtBjDI2w4HifJfMAhhOqDuktAokaSa234=
 github.com/dnstap/golang-dnstap v0.4.0/go.mod h1:FqsSdH58NAmkAvKcpyxht7i4FoBjKu8E4JUPt8ipSUs=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
