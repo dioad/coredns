@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.28.5
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.5
 	github.com/coredns/caddy v1.1.2-0.20241029205200-8de985351a98
-	github.com/dioad/coredns-dioadconnect v0.8.4
+	github.com/dioad/coredns-dioadconnect v0.8.5
 	github.com/dnstap/golang-dnstap v0.4.0
 	github.com/expr-lang/expr v1.16.9
 	github.com/farsightsec/golang-framestream v0.3.0
