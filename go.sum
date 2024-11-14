@@ -113,6 +113,8 @@ github.com/dioad/connect-control v0.30.24 h1:TO269yya1K/V9DJXWx6uYCilzAAvs7L5rVv
 github.com/dioad/connect-control v0.30.24/go.mod h1:rTPDTLfe6D3WvYTi4cs+fkXkc2J1ijLivntKpqoTTeM=
 github.com/dioad/coredns-dioadconnect v0.9.0 h1:5wUcV0zsI0gEjv6IjD8o23yeSnKmNY5Ngh9ebPutDVg=
 github.com/dioad/coredns-dioadconnect v0.9.0/go.mod h1:8hkyh/k/62cgd5gNo0WTbBUAqt8mHGQSk/RsFVW8GVA=
+github.com/dioad/coredns-dioadconnect v0.9.1 h1:22Z+K9R8Vq+jSJHfm9fR3DDBMqVDaiup9rTlzN3hSY8=
+github.com/dioad/coredns-dioadconnect v0.9.1/go.mod h1:RuyjieepKf0sZD/DqbWvj42t3Z4sBOZU7NLzxaBeHJA=
 github.com/dioad/generics v0.0.7 h1:a4yxCB+GDZ6NodxYnkikgOb6Lq9RBsKWVahkS97F5eg=
 github.com/dioad/generics v0.0.7/go.mod h1:NFn4N/41m2Ln8xjKm6c9ieZQeKohyCEg0RfQg34aVRg=
 github.com/dioad/net v0.43.9 h1:kTaLvztMLxXoTXUbMEqmPVOO/4w+lhoGk4VplhpwJKk=
@@ -157,6 +159,7 @@ github.com/go-openapi/jsonreference v0.20.2/go.mod h1:Bl1zwGIM8/wsvqjsOQLJ/SH+En
 github.com/go-openapi/swag v0.22.3/go.mod h1:UzaqsxGiab7freDnrUUra0MwWfN/q7tE4j+VcZ0yl14=
 github.com/go-openapi/swag v0.22.4 h1:QLMzNJnMGPRNDCbySlcj1x01tzU8/9LTTL9hZZZogBU=
 github.com/go-openapi/swag v0.22.4/go.mod h1:UzaqsxGiab7freDnrUUra0MwWfN/q7tE4j+VcZ0yl14=
+github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 h1:tfuBGBXKqDEevZMzYi5KSi8KkcZtzBcTgAUUtapy0OI=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
 github.com/go-task/slim-sprig/v3 v3.0.0/go.mod h1:W848ghGpv3Qj3dhTPRyJypKRiqCdHZiAzKg9hl15HA8=
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
