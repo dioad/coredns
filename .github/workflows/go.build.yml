@@ -100,7 +100,7 @@ jobs:
         env:
           CI: false
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.OUTPUT_ZIP }}
           path: ${{ env.OUTPUT_ZIP }}
