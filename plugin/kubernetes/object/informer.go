@@ -17,7 +17,6 @@ func NewIndexerInformer(lw cache.ListerWatcher, objType runtime.Object, h cache.
 		ListerWatcher:    lw,
 		ObjectType:       objType,
 		FullResyncPeriod: defaultResyncPeriod,
-		RetryOnError:     false,
 		Process:          builder(clientState, h),
 	}
 	return clientState, cache.New(cfg)
@@ -40,6 +39,9 @@ func DefaultProcessor(convert ToFunc, recordLatency *EndpointLatencyRecorder) Pr
 				case cache.Sync, cache.Added, cache.Updated:
 					obj, err := convert(d.Object.(meta.Object))
 					if err != nil {
+						if err == errPodTerminating {
+							continue
+						}
 						return err
 					}
 					if old, exists, err := clientState.Get(obj); err == nil && exists {

@@ -45,11 +45,12 @@ type Forward struct {
 
 	nextAlternateRcodes []int
 
-	tlsConfig     *tls.Config
-	tlsServerName string
-	maxfails      uint32
-	expire        time.Duration
-	maxConcurrent int64
+	tlsConfig                  *tls.Config
+	tlsServerName              string
+	maxfails                   uint32
+	expire                     time.Duration
+	maxConcurrent              int64
+	failfastUnhealthyUpstreams bool
 
 	opts proxy.Options // also here for testing
 
@@ -72,6 +73,11 @@ func New() *Forward {
 func (f *Forward) SetProxy(p *proxy.Proxy) {
 	f.proxies = append(f.proxies, p)
 	p.Start(f.hcInterval)
+}
+
+// SetProxyOptions setup proxy options
+func (f *Forward) SetProxyOptions(opts proxy.Options) {
+	f.opts = opts
 }
 
 // SetTapPlugin appends one or more dnstap plugins to the tap plugin list.
@@ -126,12 +132,16 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 			if fails < len(f.proxies) {
 				continue
 			}
-			// All upstream proxies are dead, assume healthcheck is completely broken and randomly
+
+			healthcheckBrokenCount.Add(1)
+			// All upstreams are dead, return servfail if all upstreams are down
+			if f.failfastUnhealthyUpstreams {
+				break
+			}
+			// assume healthcheck is completely broken and randomly
 			// select an upstream to connect to.
 			r := new(random)
 			proxy = r.List(f.proxies)[0]
-
-			healthcheckBrokenCount.Add(1)
 		}
 
 		if span != nil {
