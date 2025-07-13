@@ -118,6 +118,17 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get install make curl
 
+      - name: Configure github token
+        env:
+          TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
+          TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.com".insteadOf "https://github.com"
+
+      - name: Get dependencies
+        run: |
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+
       - name: Test Makefile.release release
         run: make GITHUB_ACCESS_TOKEN=x release -f Makefile.release
 
