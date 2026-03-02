@@ -73,7 +73,10 @@ func (z *Zone) CopyWithoutApex() *Zone {
 
 // Insert inserts r into z.
 func (z *Zone) Insert(r dns.RR) error {
-	r.Header().Name = strings.ToLower(r.Header().Name)
+	// r.Header().Name = strings.ToLower(r.Header().Name)
+	if r.Header().Rrtype != dns.TypeSRV {
+		r.Header().Name = strings.ToLower(r.Header().Name)
+	}
 
 	switch h := r.Header().Rrtype; h {
 	case dns.TypeNS:
@@ -108,7 +111,7 @@ func (z *Zone) Insert(r dns.RR) error {
 	case dns.TypeMX:
 		r.(*dns.MX).Mx = strings.ToLower(r.(*dns.MX).Mx)
 	case dns.TypeSRV:
-		r.(*dns.SRV).Target = strings.ToLower(r.(*dns.SRV).Target)
+		// r.(*dns.SRV).Target = strings.ToLower(r.(*dns.SRV).Target)
 	}
 
 	z.Tree.Insert(r)
@@ -160,19 +163,22 @@ func (z *Zone) nameFromRight(qname string, i int) (string, bool) {
 		return z.origin, false
 	}
 
+	n := len(qname)
 	for j := 1; j <= z.origLen; j++ {
-		if _, shot := dns.PrevLabel(qname, j); shot {
+		if m, shot := dns.PrevLabel(qname[:n], 1); shot {
 			return qname, shot
+		} else {
+			n = m
 		}
 	}
 
-	k := 0
-	var shot bool
 	for j := 1; j <= i; j++ {
-		k, shot = dns.PrevLabel(qname, j+z.origLen)
+		m, shot := dns.PrevLabel(qname[:n], 1)
 		if shot {
 			return qname, shot
+		} else {
+			n = m
 		}
 	}
-	return qname[k:], false
+	return qname[n:], false
 }

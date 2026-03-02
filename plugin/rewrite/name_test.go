@@ -33,8 +33,7 @@ func TestRewriteIllegalName(t *testing.T) {
 }
 
 func TestRewriteNamePrefixSuffix(t *testing.T) {
-	ctx, close := context.WithCancel(context.TODO())
-	defer close()
+	ctx := t.Context()
 
 	tests := []struct {
 		next     string
@@ -75,8 +74,7 @@ func TestRewriteNamePrefixSuffix(t *testing.T) {
 }
 
 func TestRewriteNameNoRewrite(t *testing.T) {
-	ctx, close := context.WithCancel(context.TODO())
-	defer close()
+	ctx := t.Context()
 
 	tests := []struct {
 		next     string
@@ -117,8 +115,7 @@ func TestRewriteNameNoRewrite(t *testing.T) {
 }
 
 func TestRewriteNamePrefixSuffixNoAutoAnswer(t *testing.T) {
-	ctx, close := context.WithCancel(context.TODO())
-	defer close()
+	ctx := t.Context()
 
 	tests := []struct {
 		next     string
@@ -159,8 +156,7 @@ func TestRewriteNamePrefixSuffixNoAutoAnswer(t *testing.T) {
 }
 
 func TestRewriteNamePrefixSuffixAutoAnswer(t *testing.T) {
-	ctx, close := context.WithCancel(context.TODO())
-	defer close()
+	ctx := t.Context()
 
 	tests := []struct {
 		next     string
@@ -207,8 +203,7 @@ func TestRewriteNamePrefixSuffixAutoAnswer(t *testing.T) {
 }
 
 func TestRewriteNameExactAnswer(t *testing.T) {
-	ctx, close := context.WithCancel(context.TODO())
-	defer close()
+	ctx := t.Context()
 
 	tests := []struct {
 		next     string
@@ -255,8 +250,7 @@ func TestRewriteNameExactAnswer(t *testing.T) {
 }
 
 func TestRewriteNameRegexAnswer(t *testing.T) {
-	ctx, close := context.WithCancel(context.TODO())
-	defer close()
+	ctx := t.Context()
 
 	tests := []struct {
 		next     string
@@ -372,5 +366,16 @@ func TestNewNameRule(t *testing.T) {
 			continue
 		}
 		t.Fatalf("Test %d: FAIL, expected fail=%t, but received fail=%t: (%s) %s, rule=%v", i, tc.expectedFail, failed, tc.next, tc.args, rule)
+	}
+}
+
+func TestNewNameRuleLargeRegex(t *testing.T) {
+	largeRegex := strings.Repeat("a", maxRegexpLen+1)
+	_, err := newNameRule("stop", "regex", largeRegex, "replacement")
+	if err == nil {
+		t.Fatal("Expected error for large regex, got nil")
+	}
+	if !strings.Contains(err.Error(), "too long") {
+		t.Errorf("Expected 'too long' error, got: %v", err)
 	}
 }

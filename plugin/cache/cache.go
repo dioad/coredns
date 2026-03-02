@@ -117,13 +117,7 @@ func hash(qname string, qtype uint16, do, cd bool) uint64 {
 }
 
 func computeTTL(msgTTL, minTTL, maxTTL time.Duration) time.Duration {
-	ttl := msgTTL
-	if ttl < minTTL {
-		ttl = minTTL
-	}
-	if ttl > maxTTL {
-		ttl = maxTTL
-	}
+	ttl := min(max(msgTTL, minTTL), maxTTL)
 	return ttl
 }
 
@@ -308,9 +302,9 @@ func (w *verifyStaleResponseWriter) WriteMsg(res *dns.Msg) error {
 }
 
 const (
-	maxTTL  = dnsutil.MaximumDefaulTTL
+	maxTTL  = dnsutil.MaximumDefaultTTL
 	minTTL  = dnsutil.MinimalDefaultTTL
-	maxNTTL = dnsutil.MaximumDefaulTTL / 2
+	maxNTTL = dnsutil.MaximumDefaultTTL / 2
 	minNTTL = dnsutil.MinimalDefaultTTL
 
 	defaultCap = 10000 // default capacity of the cache.

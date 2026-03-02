@@ -74,7 +74,8 @@ The match type, e.g., `exact`, `substring`, etc., triggers rewrite:
 * **substring**: on a partial match of the name in the question section of a request
 * **prefix**: when the name begins with the matching string
 * **suffix**: when the name ends with the matching string
-* **regex**: when the name in the question section of a request matches a regular expression
+* **regex**: when the name in the question section of a request matches a regular expression.
+  Regex patterns must not exceed 10000 characters.
 
 If the match type is omitted, the `exact` match type is assumed. If OPTIONS are
 given, the type must be specified.
@@ -454,7 +455,7 @@ rewrite edns0 local unset 0xffee
 ### EDNS0_NSID
 
 This has no fields; it will add an NSID option with an empty string for the NSID. If the option already exists
-and the action is `replace` or `set`, then the NSID in the option will be set to the empty string.  
+and the action is `replace` or `set`, then the NSID in the option will be set to the empty string.
 The option can be removed with the `unset` action.
 
 ### EDNS0_SUBNET

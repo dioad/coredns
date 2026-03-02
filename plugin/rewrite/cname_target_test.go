@@ -2,7 +2,9 @@ package rewrite
 
 import (
 	"context"
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/coredns/coredns/plugin"
@@ -69,12 +71,12 @@ func TestCNameTargetRewrite(t *testing.T) {
 		args         []string
 		expectedType reflect.Type
 	}{
-		{[]string{"continue", "cname", "exact", "def.example.com.", "xyz.example.com."}, reflect.TypeOf(&cnameTargetRule{})},
-		{[]string{"continue", "cname", "prefix", "chat.openai.com", "bard.google.com"}, reflect.TypeOf(&cnameTargetRule{})},
-		{[]string{"continue", "cname", "suffix", "uvw.", "xyz."}, reflect.TypeOf(&cnameTargetRule{})},
-		{[]string{"continue", "cname", "substring", "efgh", "zzzz.www"}, reflect.TypeOf(&cnameTargetRule{})},
-		{[]string{"continue", "cname", "regex", `(.*)\.web\.(.*)\.site\.`, `{1}.webapp.{2}.org.`}, reflect.TypeOf(&cnameTargetRule{})},
-		{[]string{"continue", "cname", "exact", "music.truncated.spotify.com.", "music.truncated.spotify.com."}, reflect.TypeOf(&cnameTargetRule{})},
+		{[]string{"continue", "cname", "exact", "def.example.com.", "xyz.example.com."}, reflect.TypeFor[*cnameTargetRule]()},
+		{[]string{"continue", "cname", "prefix", "chat.openai.com", "bard.google.com"}, reflect.TypeFor[*cnameTargetRule]()},
+		{[]string{"continue", "cname", "suffix", "uvw.", "xyz."}, reflect.TypeFor[*cnameTargetRule]()},
+		{[]string{"continue", "cname", "substring", "efgh", "zzzz.www"}, reflect.TypeFor[*cnameTargetRule]()},
+		{[]string{"continue", "cname", "regex", `(.*)\.web\.(.*)\.site\.`, `{1}.webapp.{2}.org.`}, reflect.TypeFor[*cnameTargetRule]()},
+		{[]string{"continue", "cname", "exact", "music.truncated.spotify.com.", "music.truncated.spotify.com."}, reflect.TypeFor[*cnameTargetRule]()},
 	}
 	for i, r := range ruleset {
 		rule, err := newRule(r.args...)
@@ -205,5 +207,71 @@ func doTestCNameTargetTests(t *testing.T, rules []Rule) {
 			t.Errorf("Test %d: FAIL %s (%d) Actual and expected truncated flag do not match, actual: %v, expected: %v",
 				i, tc.from, tc.fromType, resp.Truncated, tc.expectedTruncated)
 		}
+	}
+}
+
+// nilUpstream returns a nil message to simulate an upstream failure path.
+type nilUpstream struct{}
+
+func (f *nilUpstream) Lookup(ctx context.Context, state request.Request, name string, typ uint16) (*dns.Msg, error) {
+	return nil, nil
+}
+
+// errUpstream returns a nil message with an error to simulate an upstream failure path.
+type errUpstream struct{}
+
+func (f *errUpstream) Lookup(ctx context.Context, state request.Request, name string, typ uint16) (*dns.Msg, error) {
+	return nil, errors.New("upstream failure")
+}
+
+func TestCNAMETargetRewrite_upstreamFailurePaths(t *testing.T) {
+	cases := []struct {
+		name     string
+		upstream UpstreamInt
+	}{
+		{name: "nil message, no error", upstream: &nilUpstream{}},
+		{name: "nil message, with error", upstream: &errUpstream{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rule := cnameTargetRule{
+				rewriteType:     ExactMatch,
+				paramFromTarget: "bad.target.",
+				paramToTarget:   "good.target.",
+				nextAction:      Stop,
+				Upstream:        tc.upstream,
+			}
+
+			req := new(dns.Msg)
+			req.SetQuestion("bad.test.", dns.TypeA)
+			state := request.Request{Req: req}
+
+			rrState := &cnameTargetRuleWithReqState{rule: rule, state: state, ctx: context.Background()}
+
+			res := new(dns.Msg)
+			res.SetReply(req)
+			res.Answer = []dns.RR{&dns.CNAME{Hdr: dns.RR_Header{Name: "bad.test.", Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 60}, Target: "bad.target."}}
+
+			rr := &dns.CNAME{Hdr: dns.RR_Header{Name: "bad.test.", Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: 60}, Target: "bad.target."}
+
+			rrState.RewriteResponse(res, rr)
+
+			finalTarget := res.Answer[0].(*dns.CNAME).Target
+			if finalTarget != "bad.target." {
+				t.Errorf("Expected answer to be %q, but got %q", "bad.target.", finalTarget)
+			}
+		})
+	}
+}
+
+func TestNewCNAMERuleLargeRegex(t *testing.T) {
+	largeRegex := strings.Repeat("a", maxRegexpLen+1)
+	_, err := newCNAMERule("stop", "regex", largeRegex, "replacement")
+	if err == nil {
+		t.Fatal("Expected error for large regex, got nil")
+	}
+	if !strings.Contains(err.Error(), "too long") {
+		t.Errorf("Expected 'too long' error, got: %v", err)
 	}
 }

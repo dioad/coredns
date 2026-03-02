@@ -13,6 +13,10 @@ import (
 	"github.com/miekg/dns"
 )
 
+// maxRegexpLen is a hard limit on the length of a regex pattern to prevent
+// OOM during regex compilation with malicious input.
+const maxRegexpLen = 10000
+
 // stringRewriter rewrites a string
 type stringRewriter interface {
 	rewriteString(src string) string
@@ -81,8 +85,8 @@ func newSuffixStringRewriter(orig, replacement string) stringRewriter {
 }
 
 func (r *suffixStringRewriter) rewriteString(src string) string {
-	if strings.HasSuffix(src, r.suffix) {
-		return strings.TrimSuffix(src, r.suffix) + r.replacement
+	if before, ok := strings.CutSuffix(src, r.suffix); ok {
+		return before + r.replacement
 	}
 	return src
 }
@@ -203,8 +207,8 @@ func newPrefixNameRule(nextAction string, auto bool, prefix, replacement string,
 }
 
 func (rule *prefixNameRule) Rewrite(ctx context.Context, state request.Request) (ResponseRules, Result) {
-	if strings.HasPrefix(state.Name(), rule.prefix) {
-		state.Req.Question[0].Name = rule.replacement + strings.TrimPrefix(state.Name(), rule.prefix)
+	if after, ok := strings.CutPrefix(state.Name(), rule.prefix); ok {
+		state.Req.Question[0].Name = rule.replacement + after
 		return rule.responseRuleFor(state)
 	}
 	return nil, RewriteIgnored
@@ -234,8 +238,8 @@ func newSuffixNameRule(nextAction string, auto bool, suffix, replacement string,
 }
 
 func (rule *suffixNameRule) Rewrite(ctx context.Context, state request.Request) (ResponseRules, Result) {
-	if strings.HasSuffix(state.Name(), rule.suffix) {
-		state.Req.Question[0].Name = strings.TrimSuffix(state.Name(), rule.suffix) + rule.replacement
+	if before, ok := strings.CutSuffix(state.Name(), rule.suffix); ok {
+		state.Req.Question[0].Name = before + rule.replacement
 		return rule.responseRuleFor(state)
 	}
 	return nil, RewriteIgnored
@@ -417,7 +421,7 @@ func parseAnswerRules(name string, args []string) (auto bool, rules ResponseRule
 	if auto && nameRules > 0 {
 		return false, nil, fmt.Errorf("auto name answer rule cannot be combined with explicit name anwer rules")
 	}
-	return
+	return auto, rules, nil
 }
 
 // hasClosingDot returns true if s has a closing dot at the end.
@@ -438,6 +442,9 @@ func getSubExprUsage(s string) int {
 
 // isValidRegexPattern returns a regular expression for pattern matching or errors, if any.
 func isValidRegexPattern(rewriteFrom, rewriteTo string) (*regexp.Regexp, error) {
+	if len(rewriteFrom) > maxRegexpLen {
+		return nil, fmt.Errorf("regex pattern too long: %d > %d", len(rewriteFrom), maxRegexpLen)
+	}
 	rewriteFromPattern, err := regexp.Compile(rewriteFrom)
 	if err != nil {
 		return nil, fmt.Errorf("invalid regex matching pattern: %s", rewriteFrom)

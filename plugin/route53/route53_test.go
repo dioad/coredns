@@ -75,8 +75,7 @@ func (fakeRoute53) ListResourceRecordSets(_ context.Context, in *route53.ListRes
 }
 
 func TestRoute53(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	r, err := New(ctx, fakeRoute53{}, map[string][]string{"bad.": {"0987654321"}}, time.Minute)
 	if err != nil {
@@ -253,7 +252,7 @@ func TestRoute53(t *testing.T) {
 			for i, ns := range rec.Msg.Ns {
 				got, ok := ns.(*dns.SOA)
 				if !ok {
-					t.Errorf("Test %d: Unexpected NS type. Want: SOA, got: %v", ti, reflect.TypeOf(got))
+					t.Errorf("Test %d: Unexpected NS type. Want: SOA, got: %v", ti, reflect.TypeFor[*dns.SOA]())
 				}
 				if got.String() != tc.wantNS[i] {
 					t.Errorf("Test %d: Unexpected NS.\nWant: %v\nGot: %v", ti, tc.wantNS[i], got)

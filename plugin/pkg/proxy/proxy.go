@@ -52,8 +52,16 @@ func (p *Proxy) SetTLSConfig(cfg *tls.Config) {
 // SetExpire sets the expire duration in the lower p.transport.
 func (p *Proxy) SetExpire(expire time.Duration) { p.transport.SetExpire(expire) }
 
+// SetMaxIdleConns sets the maximum idle connections per transport type.
+// A value of 0 means unlimited (default).
+func (p *Proxy) SetMaxIdleConns(n int) { p.transport.SetMaxIdleConns(n) }
+
 func (p *Proxy) GetHealthchecker() HealthChecker {
 	return p.health
+}
+
+func (p *Proxy) GetTransport() *Transport {
+	return p.transport
 }
 
 func (p *Proxy) Fails() uint32 {

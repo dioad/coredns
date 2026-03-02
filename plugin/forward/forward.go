@@ -16,7 +16,7 @@ import (
 	"github.com/coredns/coredns/plugin/dnstap"
 	"github.com/coredns/coredns/plugin/metadata"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
-	"github.com/coredns/coredns/plugin/pkg/proxy"
+	proxyPkg "github.com/coredns/coredns/plugin/pkg/proxy"
 	"github.com/coredns/coredns/request"
 
 	"github.com/miekg/dns"
@@ -36,7 +36,7 @@ const (
 type Forward struct {
 	concurrent int64 // atomic counters need to be first in struct for proper alignment
 
-	proxies    []*proxy.Proxy
+	proxies    []*proxyPkg.Proxy
 	p          Policy
 	hcInterval time.Duration
 
@@ -49,10 +49,13 @@ type Forward struct {
 	tlsServerName              string
 	maxfails                   uint32
 	expire                     time.Duration
+	maxIdleConns               int
 	maxConcurrent              int64
 	failfastUnhealthyUpstreams bool
+	failoverRcodes             []int
+	maxConnectAttempts         uint32
 
-	opts proxy.Options // also here for testing
+	opts proxyPkg.Options // also here for testing
 
 	// ErrLimitExceeded indicates that a query was rejected because the number of concurrent queries has exceeded
 	// the maximum allowed (maxConcurrent)
@@ -65,18 +68,18 @@ type Forward struct {
 
 // New returns a new Forward.
 func New() *Forward {
-	f := &Forward{maxfails: 2, tlsConfig: new(tls.Config), expire: defaultExpire, p: new(random), from: ".", hcInterval: hcInterval, opts: proxy.Options{ForceTCP: false, PreferUDP: false, HCRecursionDesired: true, HCDomain: "."}}
+	f := &Forward{maxfails: 2, tlsConfig: new(tls.Config), expire: defaultExpire, p: new(random), from: ".", hcInterval: hcInterval, opts: proxyPkg.Options{ForceTCP: false, PreferUDP: false, HCRecursionDesired: true, HCDomain: "."}}
 	return f
 }
 
 // SetProxy appends p to the proxy list and starts healthchecking.
-func (f *Forward) SetProxy(p *proxy.Proxy) {
+func (f *Forward) SetProxy(p *proxyPkg.Proxy) {
 	f.proxies = append(f.proxies, p)
 	p.Start(f.hcInterval)
 }
 
 // SetProxyOptions setup proxy options
-func (f *Forward) SetProxyOptions(opts proxy.Options) {
+func (f *Forward) SetProxyOptions(opts proxyPkg.Options) {
 	f.opts = opts
 }
 
@@ -118,7 +121,9 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	list := f.List()
 	deadline := time.Now().Add(defaultTimeout)
 	start := time.Now()
-	for time.Now().Before(deadline) && ctx.Err() == nil {
+	connectAttempts := uint32(0)
+
+	for time.Now().Before(deadline) && ctx.Err() == nil && (f.maxConnectAttempts == 0 || connectAttempts < f.maxConnectAttempts) {
 		if i >= len(list) {
 			// reached the end of list, reset to begin
 			i = 0
@@ -163,7 +168,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		for {
 			ret, err = proxy.Connect(ctx, state, opts)
 
-			if err == ErrCachedClosed { // Remote side closed conn, can only happen with TCP.
+			if err == proxyPkg.ErrCachedClosed { // Remote side closed conn, can only happen with TCP.
 				continue
 			}
 			// Retry with TCP if truncated and prefer_udp configured.
@@ -190,6 +195,15 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 				proxy.Healthcheck()
 			}
 
+			// If a per-request connect-attempt cap is configured, count this
+			// failed connect attempt and stop retrying when the cap is hit.
+			if f.maxConnectAttempts > 0 {
+				connectAttempts++
+				if connectAttempts >= f.maxConnectAttempts {
+					break
+				}
+			}
+
 			if fails < len(f.proxies) {
 				continue
 			}
@@ -204,6 +218,21 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 			formerr.SetRcode(state.Req, dns.RcodeFormatError)
 			w.WriteMsg(formerr)
 			return 0, nil
+		}
+
+		// Check if we have a failover Rcode defined, check if we match on the code
+		tryNext := false
+		for _, failoverRcode := range f.failoverRcodes {
+			// if we match, we continue to the next upstream in the list
+			if failoverRcode == ret.Rcode {
+				if fails < len(f.proxies) {
+					tryNext = true
+				}
+			}
+		}
+		if tryNext {
+			fails++
+			continue
 		}
 
 		// Check if we have an alternate Rcode defined, check if we match on the code
@@ -254,7 +283,7 @@ func (f *Forward) ForceTCP() bool { return f.opts.ForceTCP }
 func (f *Forward) PreferUDP() bool { return f.opts.PreferUDP }
 
 // List returns a set of proxies to be used for this client depending on the policy in f.
-func (f *Forward) List() []*proxy.Proxy { return f.p.List(f.proxies) }
+func (f *Forward) List() []*proxyPkg.Proxy { return f.p.List(f.proxies) }
 
 var (
 	// ErrNoHealthy means no healthy proxies left.

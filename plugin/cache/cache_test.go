@@ -295,7 +295,7 @@ func TestCacheInsertion(t *testing.T) {
 			}
 
 			// Attempt to retrieve cache entry
-			i := c.getIgnoreTTL(time.Now().UTC(), state, "dns://:53")
+			i := c.getIfNotStale(time.Now().UTC(), state, "dns://:53")
 			found := i != nil
 
 			if !tc.shouldCache && found {
@@ -594,18 +594,25 @@ func BenchmarkCacheResponse(b *testing.B) {
 
 	ctx := context.TODO()
 
+	// Add some answers since these need to be duplicated when
+	// serving a cached response.
+	answer := []dns.RR{
+		test.MX("miek.nl.	3601	IN	MX	1 aspmx.l.google.com."),
+		test.MX("miek.nl.	3601	IN	MX	10 aspmx2.googlemail.com."),
+	}
 	reqs := make([]*dns.Msg, 5)
 	for i, q := range []string{"example1", "example2", "a", "b", "ddd"} {
 		reqs[i] = new(dns.Msg)
 		reqs[i].SetQuestion(q+".example.org.", dns.TypeA)
+		reqs[i].Answer = answer
 	}
+	b.ResetTimer()
 
-	b.StartTimer()
-
+	rw := &test.ResponseWriter{}
 	j := 0
-	for range b.N {
+	for b.Loop() {
 		req := reqs[j]
-		c.ServeDNS(ctx, &test.ResponseWriter{}, req)
+		c.ServeDNS(ctx, rw, req)
 		j = (j + 1) % 5
 	}
 }
@@ -872,7 +879,7 @@ func TestCacheSeparation(t *testing.T) {
 			m = cacheMsg(m, tc.query)
 			state = request.Request{W: &test.ResponseWriter{}, Req: m}
 
-			item := c.getIgnoreTTL(time.Now().UTC(), state, "dns://:53")
+			item := c.getIfNotStale(time.Now().UTC(), state, "dns://:53")
 			found := item != nil
 
 			if !tc.expectCached && found {

@@ -54,6 +54,14 @@ func TestConfig(t *testing.T) {
 		{"dnstap dnstap.sock {\nidentity\n}\n", true, []results{{"dnstap.sock", false, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
 		{"dnstap dnstap.sock {\nversion\n}\n", true, []results{{"dnstap.sock", false, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
 		{"dnstap dnstap.sock {\nextra\n}\n", true, []results{{"dnstap.sock", false, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
+		// Limits and parsing for writebuffer (MiB) and queue (x10k)
+		{"dnstap dnstap.sock full 1024 2048", false, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1024, 2048}}},
+		{"dnstap dnstap.sock full 1025 1", true, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
+		{"dnstap dnstap.sock full 1 4097", true, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
+		{"dnstap dnstap.sock full 0 10", true, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
+		{"dnstap dnstap.sock full 10 0", true, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
+		{"dnstap dnstap.sock full x 10", true, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
+		{"dnstap dnstap.sock full 10 y", true, []results{{"dnstap.sock", true, "unix", []byte(hostname), []byte("-"), "", 1, 1}}},
 	}
 	for i, tc := range tests {
 		c := caddy.NewTestController("dns", tc.in)
@@ -111,7 +119,7 @@ func TestMultiDnstap(t *testing.T) {
 	handlers := dnsserver.GetConfig(c).Handlers()
 	d1, ok := handlers[0].(*Dnstap)
 	if !ok {
-		t.Fatalf("expected first plugin to be Dnstap, got %v", reflect.TypeOf(d1.Next))
+		t.Fatalf("expected first plugin to be Dnstap, got %v", reflect.TypeOf(handlers[0]))
 	}
 
 	if d1.io.(*dio).endpoint != "dnstap1.sock" {

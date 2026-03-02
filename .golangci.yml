@@ -9,10 +9,17 @@ linters:
   enable:
     - canonicalheader
     - copyloopvar
+    - durationcheck
+    - godoclint
+    - gosec
     - govet
     - ineffassign
     - intrange
+    - modernize
+    - nakedret
     - nolintlint
+    - perfsprint
+    - prealloc
     - protogetter
     - staticcheck
     - thelper
@@ -28,7 +35,18 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: _test\.go
+        linters:
+          - perfsprint
+          - gosec
   settings:
+    govet:
+      enable:
+        - nilness
+    perfsprint:
+      error-format: false
     revive:
       rules:
         - name: blank-imports
