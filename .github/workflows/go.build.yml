@@ -117,10 +117,12 @@ jobs:
           aws s3 cp ${{ env.OUTPUT_ZIP }} s3://${{ env.AWS_S3_BUCKET }}/data/${{ github.event.repository.name }}/build/${{ env.OUTPUT_ZIP }} \
              --no-guess-mime-type \
              --content-type "application/zip" \
+             --cache-control "max-age=300, public" \
              --no-progress \
              --sse AES256
           aws s3 cp ${{ env.OUTPUT_ZIP }}_SHA256SUMS s3://${{ env.AWS_S3_BUCKET }}/data/${{ github.event.repository.name }}/build/${{ env.OUTPUT_ZIP }}_SHA256SUMS \
              --no-guess-mime-type \
              --content-type "text/plain" \
+             --cache-control "max-age=300, public" \
              --no-progress \
              --sse AES256
