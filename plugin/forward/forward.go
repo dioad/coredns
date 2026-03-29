@@ -37,9 +37,10 @@ const (
 type Forward struct {
 	concurrent int64 // atomic counters need to be first in struct for proper alignment
 
-	proxies    []*proxyPkg.Proxy
-	p          Policy
-	hcInterval time.Duration
+	proxies         []*proxyPkg.Proxy
+	hostnameTargets []*HostnameTarget
+	p               Policy
+	hcInterval      time.Duration
 
 	from    string
 	ignored []string
@@ -58,7 +59,8 @@ type Forward struct {
 
 	fall fall.F
 
-	opts proxyPkg.Options // also here for testing
+	opts            proxyPkg.Options // also here for testing
+	resolveUpstream string           // optional DNS server address for resolving hostname targets
 
 	// ErrLimitExceeded indicates that a query was rejected because the number of concurrent queries has exceeded
 	// the maximum allowed (maxConcurrent)
@@ -94,8 +96,14 @@ func (f *Forward) SetTapPlugin(tapPlugin *dnstap.Dnstap) {
 	}
 }
 
-// Len returns the number of configured proxies.
-func (f *Forward) Len() int { return len(f.proxies) }
+// Len returns the number of configured proxies, including those from hostname targets.
+func (f *Forward) Len() int {
+	n := len(f.proxies)
+	for _, ht := range f.hostnameTargets {
+		n += len(ht.Proxies())
+	}
+	return n
+}
 
 // Name implements plugin.Handler.
 func (f *Forward) Name() string { return "forward" }
@@ -122,6 +130,9 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	span = ot.SpanFromContext(ctx)
 	i := 0
 	list := f.List()
+	if len(list) == 0 {
+		return dns.RcodeServerFailure, ErrNoHealthy
+	}
 	deadline := time.Now().Add(defaultTimeout)
 	start := time.Now()
 	connectAttempts := uint32(0)
@@ -137,7 +148,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		i++
 		if proxy.Down(f.maxfails) {
 			fails++
-			if fails < len(f.proxies) {
+			if fails < len(list) {
 				continue
 			}
 
@@ -149,7 +160,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 			// assume healthcheck is completely broken and randomly
 			// select an upstream to connect to.
 			r := new(random)
-			proxy = r.List(f.proxies)[0]
+			proxy = r.List(list)[0]
 		}
 
 		if span != nil {
@@ -207,7 +218,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 				}
 			}
 
-			if fails < len(f.proxies) {
+			if fails < len(list) {
 				continue
 			}
 			break
@@ -228,7 +239,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		for _, failoverRcode := range f.failoverRcodes {
 			// if we match, we continue to the next upstream in the list
 			if failoverRcode == ret.Rcode {
-				if fails < len(f.proxies) {
+				if fails < len(list) {
 					tryNext = true
 				}
 			}
@@ -293,7 +304,15 @@ func (f *Forward) ForceTCP() bool { return f.opts.ForceTCP }
 func (f *Forward) PreferUDP() bool { return f.opts.PreferUDP }
 
 // List returns a set of proxies to be used for this client depending on the policy in f.
-func (f *Forward) List() []*proxyPkg.Proxy { return f.p.List(f.proxies) }
+// It includes both statically configured proxies and those from hostname targets.
+func (f *Forward) List() []*proxyPkg.Proxy {
+	all := make([]*proxyPkg.Proxy, len(f.proxies), len(f.proxies)+8)
+	copy(all, f.proxies)
+	for _, ht := range f.hostnameTargets {
+		all = append(all, ht.Proxies()...)
+	}
+	return f.p.List(all)
+}
 
 var (
 	// ErrNoHealthy means no healthy proxies left.

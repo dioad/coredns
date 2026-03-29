@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -33,9 +35,6 @@ func setup(c *caddy.Controller) error {
 	}
 	for i := range fs {
 		f := fs[i]
-		if f.Len() > max {
-			return plugin.Error("forward", fmt.Errorf("more than %d TOs configured: %d", max, f.Len()))
-		}
 
 		if i == len(fs)-1 {
 			// last forward: point next to next plugin
@@ -75,6 +74,9 @@ func (f *Forward) OnStartup() (err error) {
 	for _, p := range f.proxies {
 		p.Start(f.hcInterval)
 	}
+	for _, ht := range f.hostnameTargets {
+		ht.start(f.hcInterval)
+	}
 	return nil
 }
 
@@ -82,6 +84,9 @@ func (f *Forward) OnStartup() (err error) {
 func (f *Forward) OnShutdown() error {
 	for _, p := range f.proxies {
 		p.Stop()
+	}
+	for _, ht := range f.hostnameTargets {
+		ht.Stop()
 	}
 	return nil
 }
@@ -147,9 +152,26 @@ func parseStanza(c *caddy.Controller) (*Forward, error) {
 		return f, c.ArgErr()
 	}
 
-	toHosts, err := parse.HostPortOrFile(to...)
+	// Enforce the upstream limit against the number of declared TO entries
+	// (each entry counts as 1, regardless of how many IPs a resolv.conf file
+	// or a hostname target resolves to at runtime).
+	if len(to) > max {
+		return f, fmt.Errorf("more than %d TOs configured: %d", max, len(to))
+	}
+
+	// Separate IP/file targets from hostname targets before block parsing,
+	// so we can validate them early without needing TLS config yet.
+	ipTo, hostnameEntries, err := splitToTargets(to)
 	if err != nil {
 		return f, err
+	}
+
+	var toHosts []string
+	if len(ipTo) > 0 {
+		toHosts, err = parse.HostPortOrFile(ipTo...)
+		if err != nil {
+			return f, err
+		}
 	}
 
 	for c.NextBlock() {
@@ -215,6 +237,26 @@ func parseStanza(c *caddy.Controller) (*Forward, error) {
 			f.proxies[i].GetHealthchecker().SetTCPTransport()
 		}
 		f.proxies[i].GetHealthchecker().SetDomain(f.opts.HCDomain)
+	}
+
+	// Build HostnameTarget objects for hostname-based upstreams. TLS config and
+	// proxy options are now available after block parsing.
+	for _, he := range hostnameEntries {
+		if !allowedTrans[he.trans] {
+			return f, fmt.Errorf("'%s' is not supported as a destination protocol in forward: %s", he.trans, he.hostname)
+		}
+		ht := newHostnameTarget("forward", he.hostname, he.port, he.trans, f.resolveUpstream)
+		ht.expire = f.expire
+		ht.maxIdleConns = f.maxIdleConns
+		ht.opts = f.opts
+		if he.trans == transport.TLS {
+			tlsCfg := f.tlsConfig.Clone()
+			if f.tlsServerName != "" {
+				tlsCfg.ServerName = f.tlsServerName
+			}
+			ht.tlsConfig = tlsCfg
+		}
+		f.hostnameTargets = append(f.hostnameTargets, ht)
 	}
 
 	return f, nil
@@ -408,6 +450,17 @@ func parseBlock(c *caddy.Controller, f *Forward) error {
 
 			f.failoverRcodes = append(f.failoverRcodes, rc)
 		}
+	case "resolve_upstream":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		resolverAddr := c.Val()
+		// Validate and normalize: must be host:port with an IP host, applying default port if needed.
+		normalizedAddr, err := parse.HostPort(resolverAddr, "53")
+		if err != nil {
+			return fmt.Errorf("resolve_upstream: %v", err)
+		}
+		f.resolveUpstream = normalizedAddr
 	default:
 		return c.Errf("unknown property '%s'", c.Val())
 	}
@@ -416,3 +469,108 @@ func parseBlock(c *caddy.Controller, f *Forward) error {
 }
 
 const max = 15 // Maximum number of upstreams.
+
+// hostnameEntry holds the parsed components of a hostname-based upstream target.
+type hostnameEntry struct {
+	hostname string
+	port     string
+	trans    string
+}
+
+// splitToTargets classifies each entry in to as either an IP/file target or a
+// hostname target. IP/file targets are returned as-is for parse.HostPortOrFile;
+// hostname targets are returned as hostnameEntry values for HostnameTarget.
+func splitToTargets(to []string) (ipTargets []string, hostnames []hostnameEntry, err error) {
+	for _, t := range to {
+		trans, addr := parse.Transport(t)
+
+		if addr == "" {
+			return nil, nil, fmt.Errorf("invalid upstream address %q: empty address", t)
+		}
+
+		// Strip zone ID for IP classification purposes.
+		host, port, splitErr := net.SplitHostPort(addr)
+		if splitErr != nil {
+			// Distinguish a bare host (no port) from a malformed host:port.
+			// If the trimmed address (brackets and zone ID stripped) contains
+			// a colon but is not a valid IP, the input is malformed (e.g.
+			// "dns.example.com:bad:extra"). Bare IPv6 addresses and IPv6 with
+			// zone IDs are valid and accepted with no port.
+			trimmed := strings.Trim(addr, "[]")
+			if idx := strings.LastIndex(trimmed, "%"); idx != -1 {
+				trimmed = trimmed[:idx]
+			}
+			if strings.Contains(trimmed, ":") && net.ParseIP(trimmed) == nil {
+				return nil, nil, fmt.Errorf("invalid upstream address %q: %v", addr, splitErr)
+			}
+			// No port — treat the whole addr as host.
+			host = strings.Trim(addr, "[]")
+			port = ""
+		}
+		// Strip any zone suffix (e.g. %eth0) before ParseIP.
+		hostNoZone := host
+		if idx := strings.LastIndex(host, "%"); idx != -1 {
+			hostNoZone = host[:idx]
+		}
+
+		if net.ParseIP(hostNoZone) != nil {
+			// Definitely an IP address: keep in the existing path.
+			ipTargets = append(ipTargets, t)
+			continue
+		}
+
+		// Not an IP. Check if it looks like a file path (absolute/relative
+		// prefix) or if a file with that name actually exists on disk.
+		// File paths are routed through parse.HostPortOrFile which handles
+		// resolv.conf-style files and returns proper errors.
+		if looksLikeFilePath(host) || fileExists(host) {
+			ipTargets = append(ipTargets, t)
+			continue
+		}
+
+		// '%' is not valid in DNS hostnames (it is only meaningful in IPv6
+		// zone IDs). Reject here rather than failing silently at runtime.
+		if strings.Contains(host, "%") {
+			return nil, nil, fmt.Errorf("invalid upstream address %q: percent sign (%%) is not allowed in DNS hostnames", t)
+		}
+
+		// Treat as a DNS hostname.
+		if port == "" {
+			switch trans {
+			case transport.TLS:
+				port = transport.TLSPort
+			default:
+				port = transport.Port
+			}
+		}
+		hostnames = append(hostnames, hostnameEntry{hostname: host, port: port, trans: trans})
+	}
+	return ipTargets, hostnames, nil
+}
+
+// looksLikeFilePath returns true when s is an absolute or relative path,
+// indicating it should be treated as a resolv.conf-style file rather than a
+// DNS hostname.
+func looksLikeFilePath(s string) bool {
+	return strings.HasPrefix(s, "/") ||
+		strings.HasPrefix(s, "./") ||
+		strings.HasPrefix(s, "../")
+}
+
+// fileExists returns true if a file exists at the given path. It is used to
+// distinguish relative-path file references (e.g. "resolv.conf") from DNS
+// hostnames that happen to contain dots.
+func fileExists(s string) bool {
+	// Only consider bare names or paths without a scheme (e.g. "dns://").
+	// Inputs that look like they contain a URI scheme are treated as hostnames.
+	if strings.Contains(s, "://") {
+		return false
+	}
+	_, err := os.Stat(s)
+	if err == nil {
+		return true
+	}
+	// Treat any error other than "does not exist" as "file exists" so downstream
+	// file parsing can surface a more specific error.
+	return !os.IsNotExist(err)
+}
