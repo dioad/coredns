@@ -15,6 +15,7 @@ import (
 	"github.com/coredns/coredns/plugin/debug"
 	"github.com/coredns/coredns/plugin/dnstap"
 	"github.com/coredns/coredns/plugin/metadata"
+	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	proxyPkg "github.com/coredns/coredns/plugin/pkg/proxy"
 	"github.com/coredns/coredns/request"
@@ -54,6 +55,8 @@ type Forward struct {
 	failfastUnhealthyUpstreams bool
 	failoverRcodes             []int
 	maxConnectAttempts         uint32
+
+	fall fall.F
 
 	opts proxyPkg.Options // also here for testing
 
@@ -242,6 +245,13 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 					return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, r)
 				}
 			}
+		}
+
+		// If fallthrough is configured and the upstream returned NXDOMAIN, pass
+		// to the next plugin in the chain regardless of its type. This differs
+		// from 'next' which only falls through to another *Forward plugin.
+		if ret.Rcode == dns.RcodeNameError && f.fall.Through(state.Name()) && f.Next != nil {
+			return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, r)
 		}
 
 		w.WriteMsg(ret)

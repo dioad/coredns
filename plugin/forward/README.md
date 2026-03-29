@@ -53,6 +53,7 @@ forward FROM TO... {
     health_check DURATION [no_rec] [domain FQDN]
     max_concurrent MAX
     next RCODE_1 [RCODE_2] [RCODE_3...]
+    fallthrough [ZONES...]
     failfast_all_unhealthy_upstreams
     failover RCODE_1 [RCODE_2] [RCODE_3...]
 }
@@ -111,6 +112,8 @@ forward FROM TO... {
   at least greater than the expected *upstream query rate* * *latency* of the upstream servers.
   As an upper bound for **MAX**, consider that each concurrent query will use about 2kb of memory.
 * `next` If the `RCODE` (i.e. `NXDOMAIN`) is returned by the remote then execute the next plugin. If no next plugin is defined, or the next plugin is not a `forward` plugin, this setting is ignored
+* `fallthrough` [**ZONES**...] If the query name falls within one of the names handled by this `forward` block (its `FROM` clause) and the selected upstream returns `NXDOMAIN`, pass the request to the next plugin.
+    If **ZONES** is omitted, then fallthrough on upstream `NXDOMAIN` applies to all names handled by this `forward` block. If specific zones are listed (for example `in-addr.arpa` and `ip6.arpa`), then only queries whose names fall within those zones will be subject to fallthrough on upstream `NXDOMAIN`.
 * `failfast_all_unhealthy_upstreams` - determines the handling of requests when all upstream servers are unhealthy and unresponsive to health checks. Enabling this option will immediately return SERVFAIL responses for all requests. By default, requests are sent to a random upstream.
 * `failover` - By default when a DNS lookup fails to return a DNS response (e.g. timeout), _forward_ will attempt a lookup on the next upstream server. The `failover` option will make _forward_ do the same for any response with a response code matching an `RCODE` ( e.g. `SERVFAIL`、`REFUSED`). `NOERROR` cannot be used. If all upstreams have been tried, the response from the last attempt is returned.
 
