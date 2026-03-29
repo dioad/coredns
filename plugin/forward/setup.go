@@ -15,6 +15,7 @@ import (
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/dnstap"
+	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/coredns/coredns/plugin/pkg/parse"
 	"github.com/coredns/coredns/plugin/pkg/proxy"
 	pkgtls "github.com/coredns/coredns/plugin/pkg/tls"
@@ -266,6 +267,7 @@ func parseStanza(c *caddy.Controller) (*Forward, error) {
 
 func parseBlock(c *caddy.Controller, f *Forward) error {
 	config := dnsserver.GetConfig(c)
+
 	switch c.Val() {
 	case "except":
 		ignore := c.RemainingArgs()
@@ -463,6 +465,10 @@ func parseBlock(c *caddy.Controller, f *Forward) error {
 			return c.ArgErr()
 		}
 		f.nextOnNodata = true
+	case "fallthrough":
+		var fall fall.F
+		fall.SetZonesFromArgs(c.RemainingArgs())
+		f.fall = fall
 	case "failfast_all_unhealthy_upstreams":
 		args := c.RemainingArgs()
 		if len(args) != 0 {
