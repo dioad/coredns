@@ -25,8 +25,9 @@ type Transport struct {
 	tlsConfig    *tls.Config
 	proxyName    string
 
-	mu   sync.Mutex
-	stop chan struct{}
+	mu       sync.Mutex
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func newTransport(proxyName, addr string) *Transport {
@@ -97,35 +98,48 @@ func (t *Transport) cleanup(all bool) {
 
 // Yield returns the connection to transport for reuse.
 func (t *Transport) Yield(pc *persistConn) {
-	// Check if transport is stopped before acquiring lock
+	pc.used = time.Now()
+
+	t.mu.Lock()
+
+	// Re-check under lock: Stop() closes t.stop before connManager runs
+	// cleanup(true), so this select and the append below are atomic with
+	// respect to the cleanup. Without this, a Yield that passed a pre-lock
+	// stop check could still append after cleanup, leaving an open conn with
+	// no manager to ever close it.
 	select {
 	case <-t.stop:
-		// If stopped, don't return to pool, just close
+		t.mu.Unlock()
 		pc.c.Close()
 		return
 	default:
 	}
 
-	pc.used = time.Now() // update used time
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	transtype := t.transportTypeFromConn(pc)
 
 	if t.maxIdleConns > 0 && len(t.conns[transtype]) >= t.maxIdleConns {
+		t.mu.Unlock()
 		pc.c.Close()
 		return
 	}
 
 	t.conns[transtype] = append(t.conns[transtype], pc)
+	t.mu.Unlock()
 }
 
 // Start starts the transport's connection manager.
 func (t *Transport) Start() { go t.connManager() }
 
-// Stop stops the transport's connection manager.
-func (t *Transport) Stop() { close(t.stop) }
+// Stop stops the transport's connection manager and releases cached
+// connections. It is safe to call multiple times.
+func (t *Transport) Stop() {
+	t.stopOnce.Do(func() {
+		close(t.stop)
+		// Ensure cached connections are cleaned up even if connManager is
+		// not running or never observes the stop signal.
+		go t.cleanup(true)
+	})
+}
 
 // SetExpire sets the connection expire time in transport.
 func (t *Transport) SetExpire(expire time.Duration) { t.expire = expire }

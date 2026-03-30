@@ -226,6 +226,14 @@ func TestYieldAfterStop(t *testing.T) {
 	}
 }
 
+func TestTransportStopIdempotent(t *testing.T) {
+	tr := newTransport("TestTransportStopIdempotent", "127.0.0.1:53")
+	tr.Start()
+	tr.Stop()
+	// Second call must not panic.
+	tr.Stop()
+}
+
 func BenchmarkYield(b *testing.B) {
 	s := dnstest.NewServer(func(w dns.ResponseWriter, r *dns.Msg) {
 		ret := new(dns.Msg)

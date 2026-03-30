@@ -90,9 +90,15 @@ func (p *Proxy) Down(maxfails uint32) bool {
 	return fails > maxfails
 }
 
-// Stop close stops the health checking goroutine.
-func (p *Proxy) Stop()      { p.probe.Stop() }
-func (p *Proxy) finalizer() { p.transport.Stop() }
+// Stop stops the health probe and signals the underlying transport to stop.
+// Cached connections are closed asynchronously during transport cleanup.
+// It is safe to call multiple times.
+func (p *Proxy) Stop() {
+	p.probe.Stop()
+	p.transport.Stop()
+}
+
+func (p *Proxy) finalizer() { p.Stop() }
 
 // Start starts the proxy's healthchecking.
 func (p *Proxy) Start(duration time.Duration) {

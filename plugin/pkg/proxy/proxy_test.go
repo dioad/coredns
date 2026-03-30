@@ -237,6 +237,47 @@ func TestCoreDNSOverflow(t *testing.T) {
 	testConnection("BothTCPAndUDP", Options{PreferUDP: true, ForceTCP: true}, false)
 }
 
+func TestProxyStopCleansPool(t *testing.T) {
+	s := dnstest.NewServer(func(w dns.ResponseWriter, r *dns.Msg) {
+		ret := new(dns.Msg)
+		ret.SetReply(r)
+		w.WriteMsg(ret)
+	})
+	defer s.Close()
+
+	// Do not call p.Start(): no connManager goroutine means no async cleanup
+	// racing with the Yield and pool-size assertion below.
+	p := NewProxy("TestProxyStopCleansPool", s.Addr, transport.DNS)
+
+	// Dial while the transport is idle (not yet stopped).
+	c1, _, err := p.transport.Dial("udp")
+	if err != nil {
+		t.Fatalf("Failed to dial: %v", err)
+	}
+
+	p.Stop()
+
+	// Yield after Stop: the stop check inside Yield runs under t.mu, so the
+	// conn must be closed rather than returned to the pool.
+	p.transport.Yield(c1)
+
+	p.transport.mu.Lock()
+	poolSize := len(p.transport.conns[typeUDP])
+	p.transport.mu.Unlock()
+
+	if poolSize != 0 {
+		t.Errorf("transport pool: got %d connections after Stop, want 0", poolSize)
+	}
+}
+
+func TestProxyStopIsIdempotent(t *testing.T) {
+	p := NewProxy("TestProxyStopIsIdempotent", "127.0.0.1:53", transport.DNS)
+	p.Start(5 * time.Second)
+	p.Stop()
+	// Second call must not panic (Transport.Stop is protected by sync.Once).
+	p.Stop()
+}
+
 func TestShouldTruncateResponse(t *testing.T) {
 	testCases := []struct {
 		testname string
