@@ -546,12 +546,12 @@ func looksLikeFilePath(s string) bool {
 		strings.HasPrefix(s, "../")
 }
 
-// fileExists returns true if a file exists at the given path. Used to
+// fileExists returns true if a file exists at the given path. It is used to
 // distinguish relative-path file references (e.g. "resolv.conf") from DNS
 // hostnames that happen to contain dots.
 func fileExists(s string) bool {
-	// Only consider bare names or paths without a scheme. Reject anything that
-	// contains characters invalid in file paths on common platforms.
+	// Only consider bare names or paths without a scheme (e.g. "dns://").
+	// Inputs that look like they contain a URI scheme are treated as hostnames.
 	if strings.Contains(s, "://") {
 		return false
 	}

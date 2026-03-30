@@ -123,7 +123,7 @@ func (h *HostnameTarget) resolve() error {
 	// Stop and remove proxies whose IPs are no longer present.
 	for addr, p := range h.proxies {
 		if _, ok := desired[addr]; !ok {
-			p.Stop()
+			p.Close()
 			delete(h.proxies, addr)
 			log.Infof("hostname target %s: removed proxy %s", h.hostname, addr)
 		}
@@ -152,7 +152,7 @@ func (h *HostnameTarget) newProxy(addr string) *proxy.Proxy {
 	p.SetMaxIdleConns(h.maxIdleConns)
 	p.GetHealthchecker().SetRecursionDesired(h.opts.HCRecursionDesired)
 	p.GetHealthchecker().SetDomain(h.opts.HCDomain)
-	if h.opts.ForceTCP {
+	if h.opts.ForceTCP && h.tlsConfig == nil {
 		p.GetHealthchecker().SetTCPTransport()
 	}
 	// Use the configured health check interval if set; otherwise default to a
