@@ -51,6 +51,7 @@ func makeTestTarget(hostname string, lookupFn func(string) ([]string, error)) *H
 func TestHostnameTargetResolve(t *testing.T) {
 	stub := &testLookup{results: []string{"1.2.3.4", "1.2.3.5"}}
 	ht := makeTestTarget("dns.example.com", stub.lookup)
+	t.Cleanup(ht.Stop)
 
 	if err := ht.resolve(); err != nil {
 		t.Fatalf("unexpected resolve error: %v", err)
@@ -65,6 +66,7 @@ func TestHostnameTargetResolve(t *testing.T) {
 func TestHostnameTargetProxyLifecycle(t *testing.T) {
 	stub := &testLookup{results: []string{"1.2.3.4", "1.2.3.5"}}
 	ht := makeTestTarget("dns.example.com", stub.lookup)
+	t.Cleanup(ht.Stop)
 
 	// Initial resolve: 2 IPs.
 	if err := ht.resolve(); err != nil {
@@ -102,6 +104,7 @@ func TestHostnameTargetProxyLifecycle(t *testing.T) {
 func TestHostnameTargetResolveFailureKeepsProxies(t *testing.T) {
 	stub := &testLookup{results: []string{"1.2.3.4"}}
 	ht := makeTestTarget("dns.example.com", stub.lookup)
+	t.Cleanup(ht.Stop)
 
 	if err := ht.resolve(); err != nil {
 		t.Fatalf("initial resolve: %v", err)
@@ -125,6 +128,7 @@ func TestHostnameTargetResolveFailureKeepsProxies(t *testing.T) {
 func TestHostnameTargetProxiesConcurrency(t *testing.T) {
 	stub := &testLookup{results: []string{"1.2.3.4"}}
 	ht := makeTestTarget("dns.example.com", stub.lookup)
+	t.Cleanup(ht.Stop)
 	if err := ht.resolve(); err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
