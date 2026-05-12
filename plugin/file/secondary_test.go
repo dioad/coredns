@@ -113,7 +113,7 @@ func TestTransferIn(t *testing.T) {
 	z.origin = testZone
 	z.TransferFrom = []string{s.Addr}
 
-	if err := z.TransferIn(); err != nil {
+	if err := z.TransferIn(nil); err != nil {
 		t.Fatalf("Unable to run TransferIn: %v", err)
 	}
 	if z.SOA.String() != fmt.Sprintf("%s	3600	IN	SOA	bla. bla. 250 0 0 0 0", testZone) {
@@ -138,7 +138,7 @@ func TestIsNotify(t *testing.T) {
 	}
 }
 
-func newRequest(zone string, qtype uint16) request.Request {
+func newRequest(_zone string, _qtype uint16) request.Request {
 	m := new(dns.Msg)
 	m.SetQuestion("example.com.", dns.TypeA)
 	m.SetEdns0(4097, true)

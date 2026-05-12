@@ -4,11 +4,13 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/coredns/coredns/plugin/transfer"
+
 	"github.com/miekg/dns"
 )
 
 // TransferIn retrieves the zone from the masters, parses it and sets it live.
-func (z *Zone) TransferIn() error {
+func (z *Zone) TransferIn(t *transfer.Transfer) error {
 	if len(z.TransferFrom) == 0 {
 		return nil
 	}
@@ -51,12 +53,15 @@ Transfer:
 		return Err
 	}
 
-	z.Lock()
-	z.Tree = z1.Tree
-	z.Apex = z1.Apex
-	z.Expired = false
-	z.Unlock()
+	z.setData(z1.Apex, z1.Tree)
 	log.Infof("Transferred: %s from %s", z.origin, tr)
+
+	// Send notify messages to secondary servers
+	if t != nil {
+		if err := t.Notify(z.origin); err != nil {
+			log.Warningf("Failed sending notifies: %s", err)
+		}
+	}
 	return nil
 }
 
@@ -89,10 +94,11 @@ Transfer:
 	if serial == -1 {
 		return false, Err
 	}
-	if z.SOA == nil {
+	soa := z.getSOA()
+	if soa == nil {
 		return true, Err
 	}
-	return less(z.SOA.Serial, uint32(serial)), Err // #nosec G115 -- serial fits in uint32 per DNS RFC
+	return less(soa.Serial, uint32(serial)), Err // #nosec G115 -- serial fits in uint32 per DNS RFC
 }
 
 // less returns true of a is smaller than b when taking RFC 1982 serial arithmetic into account.
@@ -107,17 +113,18 @@ func less(a, b uint32) bool {
 // and uses the SOA parameters. Every refresh it will check for a new SOA number. If that fails (for all
 // server) it will retry every retry interval. If the zone failed to transfer before the expire, the zone
 // will be marked expired.
-func (z *Zone) Update(updateShutdown chan bool) error {
+func (z *Zone) Update(updateShutdown chan bool, t *transfer.Transfer) error {
 	// If we don't have a SOA, we don't have a zone, wait for it to appear.
-	for z.SOA == nil {
+	for z.getSOA() == nil {
 		time.Sleep(1 * time.Second)
 	}
 	retryActive := false
 
 Restart:
-	refresh := time.Second * time.Duration(z.SOA.Refresh)
-	retry := time.Second * time.Duration(z.SOA.Retry)
-	expire := time.Second * time.Duration(z.SOA.Expire)
+	soa := z.getSOA()
+	refresh := time.Second * time.Duration(soa.Refresh)
+	retry := time.Second * time.Duration(soa.Retry)
+	expire := time.Second * time.Duration(soa.Expire)
 
 	refreshTicker := time.NewTicker(refresh)
 	retryTicker := time.NewTicker(retry)
@@ -129,7 +136,9 @@ Restart:
 			if !retryActive {
 				break
 			}
+			z.Lock()
 			z.Expired = true
+			z.Unlock()
 
 		case <-retryTicker.C:
 			if !retryActive {
@@ -145,7 +154,7 @@ Restart:
 			}
 
 			if ok {
-				if err := z.TransferIn(); err != nil {
+				if err := z.TransferIn(t); err != nil {
 					// transfer failed, leave retryActive true
 					break
 				}
@@ -170,7 +179,7 @@ Restart:
 			}
 
 			if ok {
-				if err := z.TransferIn(); err != nil {
+				if err := z.TransferIn(t); err != nil {
 					// transfer failed
 					retryActive = true
 					break

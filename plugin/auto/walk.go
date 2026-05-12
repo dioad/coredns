@@ -14,12 +14,20 @@ import (
 func (a Auto) Walk() error {
 	// TODO(miek): should add something so that we don't stomp on each other.
 
+	// Resolve symlinks in the directory path so filepath.Walk will traverse it.
+	// filepath.Walk uses os.Lstat on the root and won't enter a symlinked directory.
+	// This is needed when DIR itself is a symlink (e.g., Kubernetes ConfigMap mounts).
+	dir := a.directory
+	if resolved, err := filepath.EvalSymlinks(a.directory); err == nil {
+		dir = resolved
+	}
+
 	toDelete := make(map[string]bool)
 	for _, n := range a.Names() {
 		toDelete[n] = true
 	}
 
-	filepath.Walk(a.directory, func(path string, info os.FileInfo, e error) error {
+	filepath.Walk(dir, func(path string, info os.FileInfo, e error) error {
 		if e != nil {
 			log.Warningf("error reading %v: %v", path, e)
 		}
@@ -39,7 +47,7 @@ func (a Auto) Walk() error {
 			return nil
 		}
 
-		reader, err := os.Open(filepath.Clean(path))
+		reader, err := os.Open(filepath.Clean(path)) //nolint:gosec // G122: path is from filepath.Walk rooted in a.directory; symlinks must be followed for configmap-style mounts
 		if err != nil {
 			log.Warningf("Opening %s failed: %s", path, err)
 			return nil
