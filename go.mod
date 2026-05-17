@@ -40,7 +40,7 @@ require (
 	golang.org/x/crypto v0.51.0
 	golang.org/x/sys v0.44.0
 	google.golang.org/api v0.275.0
-	google.golang.org/grpc v1.81.0
+	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
@@ -50,7 +50,7 @@ require (
 )
 
 require (
-	github.com/dioad/coredns-dioadconnect v0.13.0
+	github.com/dioad/coredns-dioadconnect v0.13.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/pires/go-proxyproto v0.12.0
 	github.com/prometheus/exporter-toolkit v0.16.0
@@ -89,7 +89,7 @@ require (
 	github.com/DataDog/go-tuf v1.1.1-0.5.2 // indirect
 	github.com/DataDog/sketches-go v1.4.8 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/auth0/go-jwt-middleware/v3 v3.1.0 // indirect
+	github.com/auth0/go-jwt-middleware/v3 v3.2.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.24 // indirect
@@ -110,8 +110,8 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/dioad/auth v0.5.0 // indirect
-	github.com/dioad/connect-control v0.37.0 // indirect
+	github.com/dioad/auth v0.5.4 // indirect
+	github.com/dioad/connect-control v0.37.4 // indirect
 	github.com/dioad/generics v0.0.8 // indirect
 	github.com/dioad/net v0.57.1 // indirect
 	github.com/dioad/util v0.7.0 // indirect
