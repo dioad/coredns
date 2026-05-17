@@ -50,7 +50,7 @@ require (
 )
 
 require (
-	github.com/dioad/coredns-dioadconnect v0.13.1
+	github.com/dioad/coredns-dioadconnect v0.13.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/pires/go-proxyproto v0.12.0
 	github.com/prometheus/exporter-toolkit v0.16.0
