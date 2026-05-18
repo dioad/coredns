@@ -50,7 +50,7 @@ require (
 )
 
 require (
-	github.com/dioad/coredns-dioadconnect v0.13.2
+	github.com/dioad/coredns-dioadconnect v0.13.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/pires/go-proxyproto v0.12.0
 	github.com/prometheus/exporter-toolkit v0.16.0
@@ -110,7 +110,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/dioad/auth v0.5.4 // indirect
+	github.com/dioad/auth v0.5.5 // indirect
 	github.com/dioad/connect-control v0.37.4 // indirect
 	github.com/dioad/generics v0.0.8 // indirect
 	github.com/dioad/net v0.57.1 // indirect

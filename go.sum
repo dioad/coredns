@@ -143,12 +143,12 @@ github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da h1:aIftn67I1fkbMa5
 github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
 github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi/U=
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
-github.com/dioad/auth v0.5.4 h1:KTVSGXByEalaqZ9HdWZW027d+IGH59nhvWWu1Qc5jcI=
-github.com/dioad/auth v0.5.4/go.mod h1:0TJb4MAIRI5+BlTg5FnA/HaQm3MRpOzbvlOdkort07U=
+github.com/dioad/auth v0.5.5 h1:3fuKzkx72SCqkMKxOerE305Qg2SBIQxZkVCuUtlC4j4=
+github.com/dioad/auth v0.5.5/go.mod h1:+UPGx9swdKP7+/xh2pqbO3VAuixP/u4Gx/SiMVFEjlQ=
 github.com/dioad/connect-control v0.37.4 h1:ArwfJ2TMODDXAfT+wxWZZaRnx6+2M5qaW1RarMqd8Tg=
 github.com/dioad/connect-control v0.37.4/go.mod h1:U3QJV6FEkv+XpAIQKwgp59pY0Gdh+2BtGwEQis0FJ0Q=
-github.com/dioad/coredns-dioadconnect v0.13.2 h1:SO2DwHxed1lL7gHoMWA0qQUIwOoJIFED3It17c20vxY=
-github.com/dioad/coredns-dioadconnect v0.13.2/go.mod h1:va1DSgACShh85sUGAgePIOs0g1Oo1utDO7qxREZx5WM=
+github.com/dioad/coredns-dioadconnect v0.13.3 h1:FUQyk8sv3VbbIy81yStOSKSV8wEBqPY7XJiDyYP76c8=
+github.com/dioad/coredns-dioadconnect v0.13.3/go.mod h1:8P8zNEY+BhQBrV+LqCAUDVU0dgm4pq7GQTZSjW1lXSg=
 github.com/dioad/generics v0.0.8 h1:16B4qDVZZP+wsTeDT+9ecmIyF8GuFrwdrvm5a9l3Qa4=
 github.com/dioad/generics v0.0.8/go.mod h1:NFn4N/41m2Ln8xjKm6c9ieZQeKohyCEg0RfQg34aVRg=
 github.com/dioad/net v0.57.1 h1:weL8coHNvHDMeJr7TIUmPzXcCWQ2L9a0Tz/OUe1Hh34=
