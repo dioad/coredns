@@ -50,7 +50,7 @@ require (
 )
 
 require (
-	github.com/dioad/coredns-dioadconnect v0.13.3
+	github.com/dioad/coredns-dioadconnect v0.13.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/pires/go-proxyproto v0.12.0
 	github.com/prometheus/exporter-toolkit v0.16.0
@@ -110,10 +110,10 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/dioad/auth v0.5.5 // indirect
-	github.com/dioad/connect-control v0.37.4 // indirect
+	github.com/dioad/auth v0.5.8 // indirect
+	github.com/dioad/connect-control v0.37.10 // indirect
 	github.com/dioad/generics v0.0.8 // indirect
-	github.com/dioad/net v0.57.1 // indirect
+	github.com/dioad/net v0.57.2 // indirect
 	github.com/dioad/util v0.7.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
@@ -228,7 +228,7 @@ require (
 	golang.org/x/tools v0.45.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260319201613-d00831a3d3e7 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260511170946-3700d4141b60 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260519071638-aa98bba5eb94 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.1 // indirect
