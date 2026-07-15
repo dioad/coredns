@@ -63,8 +63,7 @@ jobs:
           TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
           TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
         run: |
-          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.c
-om".insteadOf "https://github.com"
+          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.com".insteadOf "https://github.com"
 
       - name: Get dependencies
         run: |
