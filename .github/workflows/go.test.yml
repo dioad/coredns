@@ -58,6 +58,10 @@ jobs:
           go-version-file: .go-version
         id: go
 
+      - name: Get dependencies
+        run: |
+          go env -w GOPRIVATE=github.com/dioad/connect-control,github.com/dioad/coredns-dioadconnect,github.com/dioad/net
+
       - name: Build
         run: go build -v ./...
 
