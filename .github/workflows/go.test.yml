@@ -59,6 +59,7 @@ jobs:
         id: go
 
       - name: Configure github token
+        shell: bash
         env:
           TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
           TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
