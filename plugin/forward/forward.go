@@ -15,7 +15,6 @@ import (
 	"github.com/coredns/coredns/plugin/debug"
 	"github.com/coredns/coredns/plugin/dnstap"
 	"github.com/coredns/coredns/plugin/metadata"
-	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	proxyPkg "github.com/coredns/coredns/plugin/pkg/proxy"
 	"github.com/coredns/coredns/request"
@@ -37,15 +36,15 @@ const (
 type Forward struct {
 	concurrent int64 // atomic counters need to be first in struct for proper alignment
 
-	proxies         []*proxyPkg.Proxy
-	hostnameTargets []*HostnameTarget
-	p               Policy
-	hcInterval      time.Duration
+	proxies    []*proxyPkg.Proxy
+	p          Policy
+	hcInterval time.Duration
 
 	from    string
 	ignored []string
 
 	nextAlternateRcodes []int
+	nextOnNodata        bool
 
 	tlsConfig                  *tls.Config
 	tlsServerName              string
@@ -58,10 +57,11 @@ type Forward struct {
 	failoverRcodes             []int
 	maxConnectAttempts         uint32
 
-	fall fall.F
+	// Hostname resolution fields
+	resolver  []string  // custom resolver IPs for hostname TO resolution
+	toEntries []toEntry // ordered TO entries preserving config order
 
-	opts            proxyPkg.Options // also here for testing
-	resolveUpstream string           // optional DNS server address for resolving hostname targets
+	opts proxyPkg.Options // also here for testing
 
 	// ErrLimitExceeded indicates that a query was rejected because the number of concurrent queries has exceeded
 	// the maximum allowed (maxConcurrent)
@@ -97,14 +97,8 @@ func (f *Forward) SetTapPlugin(tapPlugin *dnstap.Dnstap) {
 	}
 }
 
-// Len returns the number of configured proxies, including those from hostname targets.
-func (f *Forward) Len() int {
-	n := len(f.proxies)
-	for _, ht := range f.hostnameTargets {
-		n += len(ht.Proxies())
-	}
-	return n
-}
+// Len returns the number of configured proxies.
+func (f *Forward) Len() int { return len(f.proxies) }
 
 // Name implements plugin.Handler.
 func (f *Forward) Name() string { return "forward" }
@@ -131,9 +125,6 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	span = ot.SpanFromContext(ctx)
 	i := 0
 	list := f.List()
-	if len(list) == 0 {
-		return dns.RcodeServerFailure, ErrNoHealthy
-	}
 	deadline := time.Now().Add(defaultTimeout)
 	start := time.Now()
 	connectAttempts := uint32(0)
@@ -149,7 +140,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		i++
 		if proxy.Down(f.maxfails) {
 			fails++
-			if fails < len(list) {
+			if fails < len(f.proxies) {
 				continue
 			}
 
@@ -161,7 +152,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 			// assume healthcheck is completely broken and randomly
 			// select an upstream to connect to.
 			r := new(random)
-			proxy = r.List(list)[0]
+			proxy = r.List(f.proxies)[0]
 		}
 
 		if span != nil {
@@ -219,7 +210,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 				}
 			}
 
-			if fails < len(list) {
+			if fails < len(f.proxies) {
 				continue
 			}
 			break
@@ -240,7 +231,7 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		for _, failoverRcode := range f.failoverRcodes {
 			// if we match, we continue to the next upstream in the list
 			if failoverRcode == ret.Rcode {
-				if fails < len(list) {
+				if fails < len(f.proxies) {
 					tryNext = true
 				}
 			}
@@ -259,11 +250,12 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 			}
 		}
 
-		// If fallthrough is configured and the upstream returned NXDOMAIN, pass
-		// to the next plugin in the chain regardless of its type. This differs
-		// from 'next' which only falls through to another *Forward plugin.
-		if ret.Rcode == dns.RcodeNameError && f.fall.Through(state.Name()) && f.Next != nil {
-			return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, r)
+		if f.nextOnNodata && f.Next != nil {
+			if ret.Rcode == dns.RcodeSuccess && isEmpty(ret) {
+				if _, ok := f.Next.(*Forward); ok {
+					return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, r)
+				}
+			}
 		}
 
 		w.WriteMsg(ret)
@@ -298,6 +290,19 @@ func (f *Forward) isAllowedDomain(name string) bool {
 	return true
 }
 
+func isEmpty(r *dns.Msg) bool {
+	if len(r.Answer) == 0 {
+		return true
+	}
+
+	for _, r := range r.Answer {
+		if r != nil {
+			return false
+		}
+	}
+	return true
+}
+
 // ForceTCP returns if TCP is forced to be used even when the request comes in over UDP.
 func (f *Forward) ForceTCP() bool { return f.opts.ForceTCP }
 
@@ -305,15 +310,7 @@ func (f *Forward) ForceTCP() bool { return f.opts.ForceTCP }
 func (f *Forward) PreferUDP() bool { return f.opts.PreferUDP }
 
 // List returns a set of proxies to be used for this client depending on the policy in f.
-// It includes both statically configured proxies and those from hostname targets.
-func (f *Forward) List() []*proxyPkg.Proxy {
-	all := make([]*proxyPkg.Proxy, len(f.proxies), len(f.proxies)+8)
-	copy(all, f.proxies)
-	for _, ht := range f.hostnameTargets {
-		all = append(all, ht.Proxies()...)
-	}
-	return f.p.List(all)
-}
+func (f *Forward) List() []*proxyPkg.Proxy { return f.p.List(f.proxies) }
 
 var (
 	// ErrNoHealthy means no healthy proxies left.

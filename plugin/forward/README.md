@@ -30,14 +30,10 @@ forward FROM TO...
 * **FROM** is the base domain to match for the request to be forwarded. Domains using CIDR notation
   that expand to multiple reverse zones are not fully supported; only the first expanded zone is used.
 * **TO...** are the destination endpoints to forward to. The **TO** syntax allows you to specify
-  a protocol, `tls://9.9.9.9` or `dns://` (or no protocol) for plain DNS. The number of declared
-  upstreams is limited to 15 (each TO entry counts as 1 toward this limit; a hostname that resolves
-  to multiple IPs at runtime can expand beyond 15 active proxies). In addition to IP addresses,
-  **TO** may be a DNS hostname (e.g. `dns.example.com` or
-  `dns.example.com:5353`). Hostnames are resolved at startup and periodically re-resolved at the
-  `health_check` interval (default 0.5s). If a hostname resolves to multiple IP addresses, one proxy
-  is created per IP. If re-resolution fails, existing proxies are kept until the next successful
-  resolution.
+  a protocol, `tls://9.9.9.9` or `dns://` (or no protocol) for plain DNS. The number of upstreams is
+  limited to 15. In addition to IP addresses and files (like `/etc/resolv.conf`), **TO** can also be
+  a hostname (e.g., `my-dns.svc.cluster.local`). Hostnames are resolved to IP addresses at startup.
+  See the `resolver` option below.
 
 Multiple upstreams are randomized (see `policy`) on first use. When a healthy proxy returns an error
 during the exchange the next upstream in the list is tried.
@@ -59,10 +55,9 @@ forward FROM TO... {
     health_check DURATION [no_rec] [domain FQDN]
     max_concurrent MAX
     next RCODE_1 [RCODE_2] [RCODE_3...]
-    fallthrough [ZONES...]
     failfast_all_unhealthy_upstreams
     failover RCODE_1 [RCODE_2] [RCODE_3...]
-    resolve_upstream ADDRESS
+    resolver IP[:PORT] [IP[:PORT]...]
 }
 ~~~
 
@@ -119,13 +114,10 @@ forward FROM TO... {
   at least greater than the expected *upstream query rate* * *latency* of the upstream servers.
   As an upper bound for **MAX**, consider that each concurrent query will use about 2kb of memory.
 * `next` If the `RCODE` (i.e. `NXDOMAIN`) is returned by the remote then execute the next plugin. If no next plugin is defined, or the next plugin is not a `forward` plugin, this setting is ignored
-* `fallthrough` [**ZONES**...] If the query name falls within one of the names handled by this `forward` block (its `FROM` clause) and the selected upstream returns `NXDOMAIN`, pass the request to the next plugin.
-    If **ZONES** is omitted, then fallthrough on upstream `NXDOMAIN` applies to all names handled by this `forward` block. If specific zones are listed (for example `in-addr.arpa` and `ip6.arpa`), then only queries whose names fall within those zones will be subject to fallthrough on upstream `NXDOMAIN`.
+* `next_on_nodata` If `NOERROR` is returned by the remote, but an empty answer section (`NODATA`) was provided, execute the next `forward` plugin, if configured.
 * `failfast_all_unhealthy_upstreams` - determines the handling of requests when all upstream servers are unhealthy and unresponsive to health checks. Enabling this option will immediately return SERVFAIL responses for all requests. By default, requests are sent to a random upstream.
 * `failover` - By default when a DNS lookup fails to return a DNS response (e.g. timeout), _forward_ will attempt a lookup on the next upstream server. The `failover` option will make _forward_ do the same for any response with a response code matching an `RCODE` ( e.g. `SERVFAIL`、`REFUSED`). `NOERROR` cannot be used. If all upstreams have been tried, the response from the last attempt is returned.
-* `resolve_upstream` **ADDRESS** - optional DNS server (`ip:port`) used to resolve hostname-based
-  **TO** entries. If not set, the system resolver (`/etc/resolv.conf`) is used. Only has effect when
-  at least one **TO** entry is a DNS hostname rather than an IP address. Example: `resolve_upstream 8.8.8.8:53`.
+* `resolver` **IP[:PORT] [IP[:PORT]...]** specifies one or more DNS resolver addresses used to resolve hostname-based **TO** endpoints at startup. If not specified, the system resolver (`/etc/resolv.conf`) is used. Each address is either a bare IP (IPv4 or IPv6, port 53 assumed) or `IP:port`. Multiple addresses can be specified for redundancy.
 
 Also note the TLS config is "global" for the whole forwarding proxy if you need a different
 `tls_servername` for different upstreams you're out of luck.
@@ -325,41 +317,16 @@ In the following example, if the response from `1.2.3.4` is `SERVFAIL` or `REFUS
 }
 ~~~
 
+Forward to an upstream identified by hostname, using a specific resolver to look it up:
+
+~~~ txt
+. {
+    forward . dns.example.local {
+        resolver 10.0.0.1
+    }
+}
+~~~
+
 ## See Also
 
 [RFC 7858](https://tools.ietf.org/html/rfc7858) for DNS over TLS.
-
-## Hostname-based upstreams
-
-Forward to a DNS hostname instead of a fixed IP. The hostname is resolved at startup and
-re-resolved every `health_check` interval (default 0.5s). Each resolved IP becomes its own
-upstream proxy. If the DNS name returns multiple A/AAAA records, all of them are used.
-
-~~~ corefile
-. {
-    forward . dns-resolver.example.com {
-        health_check 5s
-    }
-}
-~~~
-
-Mix IP and hostname upstreams:
-
-~~~ corefile
-. {
-    forward . 8.8.8.8 dns-resolver.example.com:5353
-}
-~~~
-
-Use a specific DNS server to resolve the hostname targets (useful when the system resolver
-is not available or not trusted):
-
-~~~ corefile
-. {
-    forward . dns-resolver.example.com {
-        health_check 5s
-        resolve_upstream 8.8.8.8:53
-    }
-}
-~~~
-
