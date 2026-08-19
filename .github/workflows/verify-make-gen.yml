@@ -18,6 +18,12 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: .go-version
+      - name: Configure github token
+        env:
+          TOKEN_USER: ${{ secrets.WORKFLOW_TOKEN_USER }}
+          TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          git config --global url."https://${TOKEN_USER}:${TOKEN}@github.com".insteadOf "https://github.com"
       - name: Run make gen
         run: make gen
       - name: Check for uncommitted changes
