@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -445,7 +446,7 @@ func (k *Kubernetes) findPods(r recordRequest, zone string) (pods []msg.Service,
 
 	for _, p := range k.APIConn.PodIndex(ip) {
 		// check for matching ip and namespace
-		if ip == p.PodIP && match(namespace, p.Namespace) {
+		if slices.Contains(p.PodIPs, ip) && match(namespace, p.Namespace) {
 			s := msg.Service{Key: strings.Join([]string{zonePath, Pod, namespace, podname}, "/"), Host: ip, TTL: k.ttl}
 			pods = append(pods, s)
 
@@ -718,8 +719,7 @@ func (k *Kubernetes) Serial(state request.Request) uint32 {
 func (k *Kubernetes) MinTTL(_state request.Request) uint32 { return k.ttl }
 
 func (k *Kubernetes) isMultiClusterZone(zone string) bool {
-	z := plugin.Zones(k.opts.multiclusterZones).Matches(zone)
-	return z != ""
+	return plugin.Zones(k.opts.multiclusterZones).Contains(zone)
 }
 
 // match checks if a and b are equal.

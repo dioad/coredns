@@ -385,6 +385,11 @@ func (z *Zone) externalLookup(ctx context.Context, state request.Request, tr *tr
 Redo:
 	cname := elem.Type(dns.TypeCNAME)
 	if len(cname) > 0 {
+		// A CNAME that points to its own owner name can only loop.
+		if dns.CanonicalName(cname[0].Header().Name) == dns.CanonicalName(cname[0].(*dns.CNAME).Target) {
+			return nil, nil, nil, ServerFailure
+		}
+
 		rrs = append(rrs, cname...)
 
 		if do {
@@ -464,6 +469,9 @@ func delegationFromElem(tr *tree.Tree, elem *tree.Elem, qname string, qtype uint
 }
 
 func (z *Zone) doLookup(ctx context.Context, state request.Request, target string, qtype uint16) ([]dns.RR, Result) {
+	if z.Upstream == nil {
+		return nil, ServerFailure
+	}
 	m, e := z.Upstream.Lookup(ctx, state, target, qtype)
 	if e != nil {
 		return nil, ServerFailure
@@ -480,6 +488,9 @@ func (z *Zone) doLookup(ctx context.Context, state request.Request, target strin
 	if m.Rcode == dns.RcodeSuccess && len(m.Answer) == 0 {
 		return m.Answer, NoData
 	}
+	// Anything else, including the REFUSED returned for a target outside every
+	// zone served here, keeps NOERROR: the CNAME is the answer and the resolver
+	// chases the target itself. See #7346.
 	return m.Answer, Success
 }
 

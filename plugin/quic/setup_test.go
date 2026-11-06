@@ -14,6 +14,7 @@ func TestQuicSetup(t *testing.T) {
 		input                  string
 		shouldErr              bool
 		expectedMaxStreams     *int
+		expectedMaxConnections *int
 		expectedWorkerPoolSize *int
 		expectedErrContent     string
 	}{
@@ -36,8 +37,22 @@ func TestQuicSetup(t *testing.T) {
 				max_streams 100
 			}`,
 			shouldErr:              false,
-			expectedMaxStreams:     pint(100),
+			expectedMaxStreams:     new(100),
 			expectedWorkerPoolSize: nil,
+		},
+		{
+			input: `quic {
+				max_connections 50
+			}`,
+			shouldErr:              false,
+			expectedMaxConnections: new(50),
+		},
+		{
+			input: `quic {
+				max_connections 0
+			}`,
+			shouldErr:              false,
+			expectedMaxConnections: new(0),
 		},
 		{
 			input: `quic {
@@ -45,16 +60,18 @@ func TestQuicSetup(t *testing.T) {
 			}`,
 			shouldErr:              false,
 			expectedMaxStreams:     nil,
-			expectedWorkerPoolSize: pint(1000),
+			expectedWorkerPoolSize: new(1000),
 		},
 		{
 			input: `quic {
 				max_streams 100
+				max_connections 50
 				worker_pool_size 1000
 			}`,
 			shouldErr:              false,
-			expectedMaxStreams:     pint(100),
-			expectedWorkerPoolSize: pint(1000),
+			expectedMaxStreams:     new(100),
+			expectedMaxConnections: new(50),
+			expectedWorkerPoolSize: new(1000),
 		},
 		{
 			input: `quic {
@@ -100,6 +117,43 @@ func TestQuicSetup(t *testing.T) {
 		},
 		{
 			input: `quic {
+				max_connections
+			}`,
+			shouldErr:          true,
+			expectedErrContent: "Wrong argument count",
+		},
+		{
+			input: `quic {
+				max_connections abc
+			}`,
+			shouldErr:          true,
+			expectedErrContent: "invalid max_connections value",
+		},
+		{
+			input: `quic {
+				max_connections -10
+			}`,
+			shouldErr:          true,
+			expectedErrContent: "non-negative integer",
+		},
+		{
+			input: `quic {
+				max_connections 50
+				max_connections 100
+			}`,
+			shouldErr:              true,
+			expectedErrContent:     "already defined",
+			expectedMaxConnections: new(50),
+		},
+		{
+			input: `quic {
+				max_connections 100 200
+			}`,
+			shouldErr:          true,
+			expectedErrContent: "Wrong argument count",
+		},
+		{
+			input: `quic {
 				worker_pool_size
 			}`,
 			shouldErr:          true,
@@ -133,7 +187,7 @@ func TestQuicSetup(t *testing.T) {
 			}`,
 			shouldErr:          true,
 			expectedErrContent: "already defined",
-			expectedMaxStreams: pint(100),
+			expectedMaxStreams: new(100),
 		},
 		{
 			input: `quic {
@@ -142,7 +196,7 @@ func TestQuicSetup(t *testing.T) {
 			}`,
 			shouldErr:              true,
 			expectedErrContent:     "already defined",
-			expectedWorkerPoolSize: pint(1000),
+			expectedWorkerPoolSize: new(1000),
 		},
 		{
 			input: `quic {
@@ -189,6 +243,7 @@ func TestQuicSetup(t *testing.T) {
 		if !test.shouldErr || (test.shouldErr && strings.Contains(test.expectedErrContent, "already defined")) {
 			config := dnsserver.GetConfig(c)
 			assertMaxStreamsValue(t, i, test.input, config.MaxQUICStreams, test.expectedMaxStreams)
+			assertMaxConnectionsValue(t, i, test.input, config.MaxQUICConnections, test.expectedMaxConnections)
 			assertWorkerPoolSizeValue(t, i, test.input, config.MaxQUICWorkerPoolSize, test.expectedWorkerPoolSize)
 		}
 	}
@@ -209,6 +264,25 @@ func assertMaxStreamsValue(t *testing.T, testIndex int, testInput string, actual
 
 	if *actual != *expected {
 		t.Errorf("Test %d (%s): Expected MaxQUICStreams to be %d, but got %d",
+			testIndex, testInput, *expected, *actual)
+	}
+}
+
+// assertMaxConnectionsValue compares the actual MaxQUICConnections value with the expected one
+func assertMaxConnectionsValue(t *testing.T, testIndex int, testInput string, actual, expected *int) {
+	t.Helper()
+	if actual == nil && expected == nil {
+		return
+	}
+
+	if (actual == nil) != (expected == nil) {
+		t.Errorf("Test %d (%s): Expected MaxQUICConnections to be %v, but got %v",
+			testIndex, testInput, formatNilableInt(expected), formatNilableInt(actual))
+		return
+	}
+
+	if *actual != *expected {
+		t.Errorf("Test %d (%s): Expected MaxQUICConnections to be %d, but got %d",
 			testIndex, testInput, *expected, *actual)
 	}
 }
@@ -239,6 +313,4 @@ func formatNilableInt(v *int) string {
 	return fmt.Sprintf("%d", *v)
 }
 
-func pint(i int) *int {
-	return &i
-}
+//go:fix inline

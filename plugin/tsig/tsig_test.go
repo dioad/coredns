@@ -216,6 +216,37 @@ func TestServeDNS(t *testing.T) {
 	}
 }
 
+func TestServeDNSRejectsNonFinalTSIG(t *testing.T) {
+	nextCalled := false
+	tsig := TSIGServer{
+		Zones: []string{"."},
+		Next: test.HandlerFunc(func(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+			nextCalled = true
+			return testHandler()(ctx, w, r)
+		}),
+	}
+
+	r := new(dns.Msg)
+	r.SetQuestion("test.example.", dns.TypeA)
+	r.SetTsig("test.key.", dns.HmacSHA256, 300, time.Now().Unix())
+	r.Extra = append(r.Extra, test.OPT(42, true))
+
+	w := dnstest.NewRecorder(&test.ResponseWriter{})
+	if _, err := tsig.ServeDNS(context.Background(), w, r); err != nil {
+		t.Fatal(err)
+	}
+
+	if nextCalled {
+		t.Error("expected non-final TSIG to be rejected before calling the next plugin")
+	}
+	if w.Msg == nil {
+		t.Fatal("expected a FORMERR response")
+	}
+	if w.Msg.Rcode != dns.RcodeFormatError {
+		t.Errorf("expected FORMERR, got %s", dns.RcodeToString[w.Msg.Rcode])
+	}
+}
+
 func TestServeDNSTsigErrors(t *testing.T) {
 	clientNow := time.Now().Unix()
 
@@ -329,6 +360,8 @@ func TestServeDNSTsigNext(t *testing.T) {
 		reqSigned    bool
 		expectExtra  []uint16
 		expectNext   int
+		expectValid  bool
+		expectKey    string
 	}{
 		{
 			desc:         "Optional TSIG",
@@ -338,6 +371,7 @@ func TestServeDNSTsigNext(t *testing.T) {
 			reqSigned:    false,
 			expectExtra:  []uint16{dns.TypeOPT},
 			expectNext:   1,
+			expectValid:  false,
 		},
 		{
 			desc:         "Missing TSIG",
@@ -355,6 +389,7 @@ func TestServeDNSTsigNext(t *testing.T) {
 			reqSigned:   true,
 			expectExtra: []uint16{dns.TypeOPT, dns.TypeTSIG},
 			expectNext:  1,
+			expectValid: false,
 		},
 		{
 			desc:         "Bad Status",
@@ -373,6 +408,8 @@ func TestServeDNSTsigNext(t *testing.T) {
 			reqSigned:    true,
 			expectExtra:  []uint16{dns.TypeOPT},
 			expectNext:   1,
+			expectValid:  true,
+			expectKey:    "test.key.",
 		},
 	}
 
@@ -385,6 +422,13 @@ func TestServeDNSTsigNext(t *testing.T) {
 				allTypes: tc.tsigRequired,
 				Next: test.HandlerFunc(func(_ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 					nextCalled++
+					keyName, validated := ValidatedKeyName(_ctx)
+					if validated != tc.expectValid {
+						t.Errorf("ValidatedKeyName() validated = %t, want %t", validated, tc.expectValid)
+					}
+					if keyName != tc.expectKey {
+						t.Errorf("ValidatedKeyName() name = %q, want %q", keyName, tc.expectKey)
+					}
 					if !slices.EqualFunc(r.Extra, tc.expectExtra, func(rr dns.RR, t uint16) bool { return rr.Header().Rrtype == t }) {
 						t.Errorf("expected %v, got %v", tc.expectExtra, r.Extra)
 					}
@@ -400,7 +444,7 @@ func TestServeDNSTsigNext(t *testing.T) {
 			r.SetQuestion("test.example.", dns.TypeA)
 			r.Extra = tc.reqExtra
 			if tc.reqSigned {
-				r.SetTsig("test.key.", dns.HmacSHA256, 300, time.Now().Unix())
+				r.SetTsig("TEST.Key", dns.HmacSHA256, 300, time.Now().Unix())
 			}
 
 			_, err := tsig.ServeDNS(ctx, w, r)

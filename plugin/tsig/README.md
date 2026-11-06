@@ -12,6 +12,10 @@ respective plugins sending those requests to sign them using the keys defined by
 
 The *tsig* plugin can also require that incoming requests be signed for certain query types, refusing requests that do not comply.
 
+After successfully validating a TSIG record, the plugin adds the normalized key name to the request context. Downstream Go
+plugins can call `tsig.ValidatedKeyName(ctx)` to retrieve the key name and distinguish validated requests from unsigned
+requests. The value is not set for requests outside the configured zones because the *tsig* plugin does not validate them.
+
 ## Syntax
 
 ~~~
@@ -97,7 +101,7 @@ With the *transfer* plugin, zone transfer notifications from CoreDNS are not TSI
 
 ### Special Considerations for Forwarding Servers (RFC 8945 5.5)
 
-https://datatracker.ietf.org/doc/html/rfc8945#section-5.5
+https://www.rfc-editor.org/info/rfc8945/#section-5.5
 
 CoreDNS does not implement this section as follows ...
 

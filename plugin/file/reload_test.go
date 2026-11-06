@@ -3,8 +3,10 @@ package file
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/coredns/coredns/plugin/test"
@@ -78,6 +80,52 @@ func TestZoneReloadSOAChange(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Zone should not have been re-parsed")
 	}
+}
+
+func TestZoneReloadSOAOrigin(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		fileName := filepath.Join(t.TempDir(), "db.example.org")
+		z, err := Parse(strings.NewReader(dbRelative), "example.org.", fileName, -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		beforeApex, beforeTree := z.snapshot()
+		updated := strings.Replace(dbRelative, " 3 3600", " 4 3600", 1)
+		updated = strings.Replace(updated, "192.0.2.1", "192.0.2.2", 1)
+		invalid := strings.Replace(updated, "@ 500 IN SOA", "child 500 IN SOA", 1)
+		if err := os.WriteFile(fileName, []byte(invalid), 0644); err != nil {
+			t.Fatal(err)
+		}
+		z.ReloadInterval = time.Second
+		if err := z.Reload(nil); err != nil {
+			t.Fatal(err)
+		}
+		defer z.OnShutdown()
+
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		apex, tree := z.snapshot()
+		if apex.SOA != beforeApex.SOA || tree != beforeTree {
+			t.Fatal("invalid reload replaced the last valid zone")
+		}
+
+		if err := os.WriteFile(fileName, []byte(updated), 0644); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+		synctest.Wait()
+		apex, tree = z.snapshot()
+		if apex.SOA.Hdr.Name != "example.org." || apex.SOA.Serial != 4 || tree == beforeTree {
+			t.Fatalf("corrected zone was not reloaded: %v", apex.SOA)
+		}
+		r := new(dns.Msg)
+		r.SetQuestion("foo.example.org.", dns.TypeA)
+		state := request.Request{W: &test.ResponseWriter{}, Req: r}
+		answer, _, _, result := z.Lookup(context.Background(), state, state.Name())
+		if result != Success || len(answer) != 1 || answer[0].String() != "foo.example.org.\t500\tIN\tA\t192.0.2.2" {
+			t.Fatalf("expected updated A record, got result %v, answer %v", result, answer)
+		}
+	})
 }
 
 func TestZoneReloadByMtime(t *testing.T) {
@@ -257,6 +305,43 @@ func TestZoneReloadByMtime(t *testing.T) {
 		_, _, _, res := z.Lookup(ctx, state, "miek.nl.")
 		if res != Success {
 			t.Fatalf("Zone should still serve queries after file deletion, got result %d", res)
+		}
+	})
+
+	// Test 5: A successful reload advances the mtime baseline.
+	t.Run("MtimeBaselineAdvancesAfterReload", func(t *testing.T) {
+		z, fileName, cleanup := prepareMtimeZone(t, reloadZoneTest)
+		defer cleanup()
+
+		if err := os.WriteFile(fileName, []byte(reloadZone2Test), 0644); err != nil {
+			t.Fatalf("Failed to write new zone data: %s", err)
+		}
+
+		var rrs []dns.RR
+		for start := time.Now(); time.Since(start) < 2*time.Second; {
+			var err error
+			rrs, err = z.ApexIfDefined()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rrs) == 3 {
+				break
+			}
+			time.Sleep(2 * time.Millisecond)
+		}
+		if len(rrs) != 3 {
+			t.Fatalf("Expected 3 RRs after reload, got %d", len(rrs))
+		}
+
+		fi, err := os.Stat(fileName)
+		if err != nil {
+			t.Fatalf("Failed to stat zone: %s", err)
+		}
+		z.RLock()
+		mtime := z.file_mtime
+		z.RUnlock()
+		if !mtime.Equal(fi.ModTime()) {
+			t.Fatalf("file mtime = %s after reload, want %s", mtime, fi.ModTime())
 		}
 	})
 }

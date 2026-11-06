@@ -123,9 +123,9 @@ tls://.:853 {
 }
 ~~~
 
-Only Knot DNS' `kdig` supports DNS-over-TLS queries, no command line client supports gRPC making
+Knot DNS' `kdig` as well as Bind9' `dig` (since 9.17.7, via `+tls`) can be used to make DNS-over-TLS queries. No command line client supports gRPC making
 debugging these transports harder than it should be.
 
 ## See Also
 
-RFC 7858 and https://grpc.io.
+[RFC 7858](https://www.rfc-editor.org/info/rfc7858/) and https://grpc.io.

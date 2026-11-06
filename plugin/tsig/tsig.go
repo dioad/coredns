@@ -32,6 +32,14 @@ func (t TSIGServer) Name() string { return pluginName }
 
 // ServeDNS implements plugin.Handler
 func (t *TSIGServer) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+	for i, rr := range r.Extra {
+		if rr.Header().Rrtype == dns.TypeTSIG && i != len(r.Extra)-1 {
+			resp := new(dns.Msg).SetRcode(r, dns.RcodeFormatError)
+			w.WriteMsg(resp)
+			return dns.RcodeSuccess, nil
+		}
+	}
+
 	var (
 		state  = request.Request{Req: r, W: w}
 		tsigRR = r.IsTsig()
@@ -39,7 +47,7 @@ func (t *TSIGServer) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 	switch {
 	case tsigRR == nil && !t.tsigRequired(state.QType(), r.Opcode):
 		fallthrough
-	case plugin.Zones(t.Zones).Matches(state.Name()) == "":
+	case !plugin.Zones(t.Zones).Contains(state.Name()):
 		return plugin.NextOrFailure(t.Name(), t.Next, ctx, w, r)
 	case tsigRR == nil:
 		log.Debugf("rejecting '%s' request without TSIG\n", dns.TypeToString[state.QType()])
@@ -71,6 +79,7 @@ func (t *TSIGServer) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 	}
 
 	tsigRR.Error = dns.RcodeSuccess
+	ctx = withValidatedKeyName(ctx, plugin.Name(tsigRR.Hdr.Name).Normalize())
 	rcode, err := plugin.NextOrFailure(t.Name(), t.Next, ctx, w, r)
 	if err != nil {
 		log.Errorf("request handler returned an error: %v\n", err)

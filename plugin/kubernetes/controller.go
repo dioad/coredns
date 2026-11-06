@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -132,7 +133,7 @@ type dnsControlOpts struct {
 }
 
 // newdnsController creates a controller for CoreDNS.
-func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsClient mcsClientset.MulticlusterV1alpha1Interface, opts dnsControlOpts) *dnsControl {
+func newdnsController(_ context.Context, kubeClient kubernetes.Interface, mcsClient mcsClientset.MulticlusterV1alpha1Interface, opts dnsControlOpts) *dnsControl {
 	dns := dnsControl{
 		client:            kubeClient,
 		mcsClient:         mcsClient,
@@ -147,8 +148,8 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsC
 	dns.svcLister, dns.svcController = object.NewIndexerInformer(
 		cache.ToListWatcherWithWatchListSemantics(
 			&cache.ListWatch{
-				ListFunc:  serviceListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-				WatchFunc: serviceWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+				ListWithContextFunc:  serviceListFunc(dns.client, api.NamespaceAll, dns.selector),
+				WatchFuncWithContext: serviceWatchFunc(dns.client, api.NamespaceAll, dns.selector),
 			},
 			kubeClient,
 		),
@@ -161,8 +162,8 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsC
 	podLister, podController := object.NewIndexerInformer(
 		cache.ToListWatcherWithWatchListSemantics(
 			&cache.ListWatch{
-				ListFunc:  podListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-				WatchFunc: podWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+				ListWithContextFunc:  podListFunc(dns.client, api.NamespaceAll, dns.selector),
+				WatchFuncWithContext: podWatchFunc(dns.client, api.NamespaceAll, dns.selector),
 			},
 			kubeClient,
 		),
@@ -183,8 +184,8 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsC
 	epLister, epController := object.NewIndexerInformer(
 		cache.ToListWatcherWithWatchListSemantics(
 			&cache.ListWatch{
-				ListFunc:  endpointSliceListFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
-				WatchFunc: endpointSliceWatchFunc(ctx, dns.client, api.NamespaceAll, dns.selector),
+				ListWithContextFunc:  endpointSliceListFunc(dns.client, api.NamespaceAll, dns.selector),
+				WatchFuncWithContext: endpointSliceWatchFunc(dns.client, api.NamespaceAll, dns.selector),
 			},
 			kubeClient,
 		),
@@ -201,8 +202,8 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsC
 	dns.nsLister, dns.nsController = object.NewIndexerInformer(
 		cache.ToListWatcherWithWatchListSemantics(
 			&cache.ListWatch{
-				ListFunc:  namespaceListFunc(ctx, dns.client, dns.namespaceSelector),
-				WatchFunc: namespaceWatchFunc(ctx, dns.client, dns.namespaceSelector),
+				ListWithContextFunc:  namespaceListFunc(dns.client, dns.namespaceSelector),
+				WatchFuncWithContext: namespaceWatchFunc(dns.client, dns.namespaceSelector),
 			},
 			kubeClient,
 		),
@@ -222,8 +223,8 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsC
 		dns.mcEpLister, dns.mcEpController = object.NewIndexerInformer(
 			cache.ToListWatcherWithWatchListSemantics(
 				&cache.ListWatch{
-					ListFunc:  endpointSliceListFunc(ctx, dns.client, api.NamespaceAll, mcsEpSelector),
-					WatchFunc: endpointSliceWatchFunc(ctx, dns.client, api.NamespaceAll, mcsEpSelector),
+					ListWithContextFunc:  endpointSliceListFunc(dns.client, api.NamespaceAll, mcsEpSelector),
+					WatchFuncWithContext: endpointSliceWatchFunc(dns.client, api.NamespaceAll, mcsEpSelector),
 				},
 				kubeClient,
 			),
@@ -235,8 +236,8 @@ func newdnsController(ctx context.Context, kubeClient kubernetes.Interface, mcsC
 		dns.svcImportLister, dns.svcImportController = object.NewIndexerInformer(
 			cache.ToListWatcherWithWatchListSemantics(
 				&cache.ListWatch{
-					ListFunc:  serviceImportListFunc(ctx, dns.mcsClient, api.NamespaceAll, dns.namespaceSelector),
-					WatchFunc: serviceImportWatchFunc(ctx, dns.mcsClient, api.NamespaceAll, dns.namespaceSelector),
+					ListWithContextFunc:  serviceImportListFunc(dns.mcsClient, api.NamespaceAll, dns.namespaceSelector),
+					WatchFuncWithContext: serviceImportWatchFunc(dns.mcsClient, api.NamespaceAll, dns.namespaceSelector),
 				},
 				kubeClient,
 			),
@@ -271,7 +272,9 @@ func podIPIndexFunc(obj any) ([]string, error) {
 	if !ok {
 		return nil, errObj
 	}
-	return []string{p.PodIP}, nil
+	idx := make([]string, len(p.PodIPs))
+	copy(idx, p.PodIPs)
+	return idx, nil
 }
 
 func svcIPIndexFunc(obj any) ([]string, error) {
@@ -334,8 +337,8 @@ func mcEpNameNamespaceIndexFunc(obj any) ([]string, error) {
 	return []string{mcEp.Index}, nil
 }
 
-func serviceListFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
+func serviceListFunc(c kubernetes.Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (runtime.Object, error) {
+	return func(ctx context.Context, opts meta.ListOptions) (runtime.Object, error) {
 		if s != nil {
 			opts.LabelSelector = s.String()
 		}
@@ -343,8 +346,8 @@ func serviceListFunc(ctx context.Context, c kubernetes.Interface, ns string, s l
 	}
 }
 
-func podListFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
+func podListFunc(c kubernetes.Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (runtime.Object, error) {
+	return func(ctx context.Context, opts meta.ListOptions) (runtime.Object, error) {
 		if s != nil {
 			opts.LabelSelector = s.String()
 		}
@@ -356,8 +359,8 @@ func podListFunc(ctx context.Context, c kubernetes.Interface, ns string, s label
 	}
 }
 
-func endpointSliceListFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
+func endpointSliceListFunc(c kubernetes.Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (runtime.Object, error) {
+	return func(ctx context.Context, opts meta.ListOptions) (runtime.Object, error) {
 		if s != nil {
 			opts.LabelSelector = s.String()
 		}
@@ -365,8 +368,8 @@ func endpointSliceListFunc(ctx context.Context, c kubernetes.Interface, ns strin
 	}
 }
 
-func namespaceListFunc(ctx context.Context, c kubernetes.Interface, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
+func namespaceListFunc(c kubernetes.Interface, s labels.Selector) func(context.Context, meta.ListOptions) (runtime.Object, error) {
+	return func(ctx context.Context, opts meta.ListOptions) (runtime.Object, error) {
 		if s != nil {
 			opts.LabelSelector = s.String()
 		}
@@ -374,8 +377,8 @@ func namespaceListFunc(ctx context.Context, c kubernetes.Interface, s labels.Sel
 	}
 }
 
-func serviceImportListFunc(ctx context.Context, c mcsClientset.MulticlusterV1alpha1Interface, ns string, s labels.Selector) func(meta.ListOptions) (runtime.Object, error) {
-	return func(opts meta.ListOptions) (runtime.Object, error) {
+func serviceImportListFunc(c mcsClientset.MulticlusterV1alpha1Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (runtime.Object, error) {
+	return func(ctx context.Context, opts meta.ListOptions) (runtime.Object, error) {
 		if s != nil {
 			opts.LabelSelector = s.String()
 		}
@@ -383,8 +386,8 @@ func serviceImportListFunc(ctx context.Context, c mcsClientset.MulticlusterV1alp
 	}
 }
 
-func serviceWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
+func serviceWatchFunc(c kubernetes.Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (watch.Interface, error) {
+	return func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
 			options.LabelSelector = s.String()
 		}
@@ -392,8 +395,8 @@ func serviceWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s 
 	}
 }
 
-func podWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
+func podWatchFunc(c kubernetes.Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (watch.Interface, error) {
+	return func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
 			options.LabelSelector = s.String()
 		}
@@ -405,8 +408,8 @@ func podWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labe
 	}
 }
 
-func endpointSliceWatchFunc(ctx context.Context, c kubernetes.Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
+func endpointSliceWatchFunc(c kubernetes.Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (watch.Interface, error) {
+	return func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
 			options.LabelSelector = s.String()
 		}
@@ -414,8 +417,8 @@ func endpointSliceWatchFunc(ctx context.Context, c kubernetes.Interface, ns stri
 	}
 }
 
-func namespaceWatchFunc(ctx context.Context, c kubernetes.Interface, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
+func namespaceWatchFunc(c kubernetes.Interface, s labels.Selector) func(context.Context, meta.ListOptions) (watch.Interface, error) {
+	return func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
 			options.LabelSelector = s.String()
 		}
@@ -423,8 +426,8 @@ func namespaceWatchFunc(ctx context.Context, c kubernetes.Interface, s labels.Se
 	}
 }
 
-func serviceImportWatchFunc(ctx context.Context, c mcsClientset.MulticlusterV1alpha1Interface, ns string, s labels.Selector) func(options meta.ListOptions) (watch.Interface, error) {
-	return func(options meta.ListOptions) (watch.Interface, error) {
+func serviceImportWatchFunc(c mcsClientset.MulticlusterV1alpha1Interface, ns string, s labels.Selector) func(context.Context, meta.ListOptions) (watch.Interface, error) {
+	return func(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
 		if s != nil {
 			options.LabelSelector = s.String()
 		}
@@ -776,7 +779,7 @@ func podModified(oldObj, newObj any) bool {
 	if !okOld || !okNew {
 		return true
 	}
-	return oldPod.PodIP != newPod.PodIP
+	return !slices.Equal(oldPod.PodIPs, newPod.PodIPs)
 }
 
 // endpointsEquivalent checks if the update to an endpoint is something

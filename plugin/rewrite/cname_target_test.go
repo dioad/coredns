@@ -269,7 +269,7 @@ func TestCNAMETargetRewrite_upstreamFailurePaths(t *testing.T) {
 			req.SetQuestion("bad.test.", dns.TypeA)
 			state := request.Request{Req: req}
 
-			rrState := &cnameTargetRuleWithReqState{rule: rule, state: state, ctx: context.Background()}
+			rrState := &cnameTargetRuleWithReqState{rule: &rule, state: state, ctx: context.Background()}
 
 			res := new(dns.Msg)
 			res.SetReply(req)
@@ -284,6 +284,30 @@ func TestCNAMETargetRewrite_upstreamFailurePaths(t *testing.T) {
 				t.Errorf("Expected answer to be %q, but got %q", "bad.target.", finalTarget)
 			}
 		})
+	}
+}
+
+// BenchmarkCNAMETargetRuleRewrite isolates cnameTargetRule.Rewrite - the call
+// that used to copy the whole shared rule struct by value into
+// cnameTargetRuleWithReqState on every matching request. It deliberately
+// excludes RewriteResponse/the upstream lookup, whose own allocations would
+// dwarf the struct copy and hide the difference this benchmark exists to show.
+func BenchmarkCNAMETargetRuleRewrite(b *testing.B) {
+	rule, err := newCNAMERule("stop", "exact", "def.example.com", "xyz.example.com")
+	if err != nil {
+		b.Fatal(err)
+	}
+	rule.(*cnameTargetRule).Upstream = &MockedUpstream{}
+
+	ctx := b.Context()
+	m := new(dns.Msg)
+	m.SetQuestion("abc.example.com.", dns.TypeA)
+	state := request.Request{Req: m}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		rules, _ := rule.Rewrite(ctx, state)
+		rulesSink = rules
 	}
 }
 
@@ -312,5 +336,75 @@ func TestNewCNAMERuleNormalization(t *testing.T) {
 	}
 	if cnameRule.paramToTarget != "vpce-123.amazonaws.com." {
 		t.Errorf("expected toTarget to be normalized to 'vpce-123.amazonaws.com.', got %q", cnameRule.paramToTarget)
+	}
+}
+
+type cnameLoopBackend struct{}
+
+func (cnameLoopBackend) Name() string { return "cname-loop" }
+
+func (cnameLoopBackend) ServeDNS(_ context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	m.Authoritative = true
+
+	switch r.Question[0].Name {
+	case "victim.poc.internal.", "target.poc.internal.":
+		m.Answer = []dns.RR{
+			test.CNAME(r.Question[0].Name + " 500 IN CNAME loop.poc.internal."),
+			test.A("loop.poc.internal. 500 IN A 192.0.2.1"),
+		}
+	}
+
+	w.WriteMsg(m)
+	return dns.RcodeSuccess, nil
+}
+
+type reentrantCNAMEUpstream struct {
+	top      plugin.Handler
+	calls    int
+	maxCalls int
+	exceeded bool
+}
+
+func (u *reentrantCNAMEUpstream) Lookup(ctx context.Context, state request.Request, name string, typ uint16) (*dns.Msg, error) {
+	u.calls++
+	if u.calls > u.maxCalls {
+		u.exceeded = true
+		return nil, errors.New("test recursion limit exceeded")
+	}
+
+	req := state.NewWithQuestion(name, typ)
+	rec := dnstest.NewRecorder(state.W)
+	_, err := u.top.ServeDNS(ctx, rec, req.Req)
+	return rec.Msg, err
+}
+
+func TestCNAMETargetRewriteLoop(t *testing.T) {
+	rule, err := newCNAMERule(Stop, ExactMatch, "loop.poc.internal.", "target.poc.internal.")
+	if err != nil {
+		t.Fatalf("newCNAMERule failed: %v", err)
+	}
+
+	rw := &Rewrite{
+		Next:  cnameLoopBackend{},
+		Rules: []Rule{rule},
+	}
+	const maxExpectedLookups = 9
+	upstream := &reentrantCNAMEUpstream{top: rw, maxCalls: maxExpectedLookups + 1}
+	rule.(*cnameTargetRule).Upstream = upstream
+
+	req := new(dns.Msg)
+	req.SetQuestion("victim.poc.internal.", dns.TypeA)
+	rec := dnstest.NewRecorder(&test.ResponseWriter{})
+	if _, err := rw.ServeDNS(context.Background(), rec, req); err != nil {
+		t.Fatalf("ServeDNS returned error: %v", err)
+	}
+
+	if upstream.exceeded {
+		t.Fatalf("rewrite cname recursion exceeded %d internal lookups", upstream.maxCalls)
+	}
+	if upstream.calls > maxExpectedLookups {
+		t.Fatalf("rewrite cname recursion was not bounded: got %d internal lookups", upstream.calls)
 	}
 }

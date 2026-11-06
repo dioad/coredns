@@ -558,9 +558,8 @@ func TestCacheInsertion(t *testing.T) {
 
 				// TODO: If we incorporate these individual checks into the
 				//       test.Header function, we can eliminate them from here.
-				// Cache entries are always Authoritative.
-				if resp.Authoritative != true {
-					t.Error("Expected Authoritative Answer bit to be true, but was false")
+				if resp.Authoritative != tc.out.Authoritative {
+					t.Errorf("Expected Authoritative Answer bit to be %t, but got %t", tc.out.Authoritative, resp.Authoritative)
 				}
 				if resp.AuthenticatedData != tc.out.AuthenticatedData {
 					t.Errorf("Expected Authenticated Data bit to be %t, but got %t", tc.out.AuthenticatedData, resp.AuthenticatedData)
@@ -645,6 +644,124 @@ func TestCacheServfailTTL0(t *testing.T) {
 	c.ServeDNS(ctx, &test.ResponseWriter{}, req)
 	if c.ncache.Len() != 0 {
 		t.Errorf("SERVFAIL response should not have been cached")
+	}
+}
+
+// TestCacheServfailOnTimeout verifies that a resolver which fails without
+// writing a response (e.g. forward on an upstream timeout) is cached as a
+// SERVFAIL bounded by the servfail TTL, so client retries are answered from
+// the cache instead of reaching the upstream again.
+func TestCacheServfailOnTimeout(t *testing.T) {
+	c := New()
+	c.minpttl = minTTL
+	c.minnttl = minNTTL
+	c.failttl = 5 * time.Second
+
+	backendQueries := 0
+	c.Next = plugin.HandlerFunc(func(context.Context, dns.ResponseWriter, *dns.Msg) (int, error) {
+		backendQueries++
+		return dns.RcodeServerFailure, fmt.Errorf("upstream timeout")
+	})
+
+	req := new(dns.Msg)
+	req.SetQuestion("example.org.", dns.TypeA)
+	ctx := context.TODO()
+
+	// The first query is a miss and reaches the failing backend.
+	if ret, err := c.ServeDNS(ctx, &test.ResponseWriter{}, req); err == nil || ret != dns.RcodeServerFailure {
+		t.Fatalf("expected SERVFAIL from backend, got rcode %d and error %v", ret, err)
+	}
+	if backendQueries != 1 {
+		t.Fatalf("expected 1 backend query, got %d", backendQueries)
+	}
+
+	// The failure should now be cached.
+	rec := dnstest.NewRecorder(&test.ResponseWriter{})
+	if ret, err := c.ServeDNS(ctx, rec, req); err != nil || ret != dns.RcodeSuccess {
+		t.Fatalf("expected cached response, got rcode %d and error %v", ret, err)
+	}
+	if backendQueries != 1 {
+		t.Fatalf("expected the timeout to be cached, but the backend was queried again (%d times)", backendQueries)
+	}
+	if rec.Msg == nil || rec.Msg.Rcode != dns.RcodeServerFailure {
+		t.Fatalf("expected a cached SERVFAIL response, got %v", rec.Msg)
+	}
+}
+
+// TestCacheServfailOnTimeoutDisabled verifies that a zero servfail TTL keeps the
+// previous behaviour and leaves the failure uncached.
+func TestCacheServfailOnTimeoutDisabled(t *testing.T) {
+	c := New()
+	c.minpttl = minTTL
+	c.minnttl = minNTTL
+	c.failttl = 0
+
+	backendQueries := 0
+	c.Next = plugin.HandlerFunc(func(context.Context, dns.ResponseWriter, *dns.Msg) (int, error) {
+		backendQueries++
+		return dns.RcodeServerFailure, fmt.Errorf("upstream timeout")
+	})
+
+	req := new(dns.Msg)
+	req.SetQuestion("example.org.", dns.TypeA)
+	ctx := context.TODO()
+
+	c.ServeDNS(ctx, &test.ResponseWriter{}, req)
+	c.ServeDNS(ctx, &test.ResponseWriter{}, req)
+	if backendQueries != 2 {
+		t.Fatalf("expected the failure not to be cached, got %d backend queries", backendQueries)
+	}
+}
+
+// TestCacheServfailOnCanceledRequest verifies that a failure caused by a
+// canceled request context (e.g. a canceled DoH request) is not stored in the
+// shared SERVFAIL cache and therefore cannot make subsequent healthy requests
+// fail.
+func TestCacheServfailOnCanceledRequest(t *testing.T) {
+	c := New()
+	c.minpttl = minTTL
+	c.minnttl = minNTTL
+	c.failttl = 5 * time.Second
+
+	backendQueries := 0
+	c.Next = plugin.HandlerFunc(func(_ context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+		backendQueries++
+		if backendQueries == 1 {
+			// Simulate forward returning SERVFAIL without writing a response
+			// because the request was canceled.
+			return dns.RcodeServerFailure, fmt.Errorf("request canceled")
+		}
+		m := new(dns.Msg)
+		m.SetReply(r)
+		m.Response, m.RecursionAvailable = true, true
+		m.Answer = []dns.RR{test.A(fmt.Sprintf("%s 300 IN A 192.0.2.1", r.Question[0].Name))}
+		w.WriteMsg(m)
+		return dns.RcodeSuccess, nil
+	})
+
+	req := new(dns.Msg)
+	req.SetQuestion("example.org.", dns.TypeA)
+
+	// A canceled request must not populate the shared failure cache.
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := c.ServeDNS(canceledCtx, &test.ResponseWriter{}, req); err == nil {
+		t.Fatal("expected an error from the canceled request")
+	}
+	if c.ncache.Len() != 0 {
+		t.Fatalf("canceled request must not be cached as a failure, got %d entries", c.ncache.Len())
+	}
+
+	// A subsequent healthy request must reach the backend and succeed.
+	rec := dnstest.NewRecorder(&test.ResponseWriter{})
+	if ret, err := c.ServeDNS(context.TODO(), rec, req); err != nil || ret != dns.RcodeSuccess {
+		t.Fatalf("expected healthy answer, got rcode %d and error %v", ret, err)
+	}
+	if backendQueries != 2 {
+		t.Fatalf("expected the live request to reach the backend, got %d backend queries", backendQueries)
+	}
+	if rec.Msg == nil || rec.Msg.Rcode != dns.RcodeSuccess || len(rec.Msg.Answer) == 0 {
+		t.Fatalf("expected a healthy answer, got %v", rec.Msg)
 	}
 }
 
@@ -980,8 +1097,8 @@ func TestServeFromStaleCacheFetchVerifyTimeoutFastUpstream(t *testing.T) {
 	if got := rec.Msg.Answer[0].Header().Ttl; got != 200 {
 		t.Errorf("expected fresh TTL=200, got %d", got)
 	}
-	if !rec.Msg.Authoritative {
-		t.Error("expected cached fresh response to preserve authoritative cache reply shaping")
+	if rec.Msg.Authoritative {
+		t.Error("expected AA=0: the freshly verified answer came from a non-authoritative backend")
 	}
 }
 
@@ -1107,6 +1224,22 @@ func BackendHandler() plugin.Handler {
 		m.SetReply(r)
 		m.Response = true
 		m.RecursionAvailable = true
+
+		owner := m.Question[0].Name
+		m.Answer = []dns.RR{test.A(owner + " 303 IN A 127.0.0.53")}
+
+		w.WriteMsg(m)
+		return dns.RcodeSuccess, nil
+	})
+}
+
+func authoritativeBackend(calls *int) plugin.Handler {
+	return plugin.HandlerFunc(func(_ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+		*calls++
+		m := new(dns.Msg)
+		m.SetReply(r)
+		m.Response = true
+		m.Authoritative = true
 
 		owner := m.Question[0].Name
 		m.Answer = []dns.RR{test.A(owner + " 303 IN A 127.0.0.53")}
@@ -1973,5 +2106,36 @@ func TestServeFromStaleCacheFetchVerifyTimeoutMetadataIsolation(t *testing.T) {
 
 	if f := metadata.ValueFunc(ctx, "test/background"); f != nil {
 		t.Fatalf("background verifier mutated foreground metadata: %q", f())
+	}
+}
+
+func TestCacheWriteMsgNilResponse(t *testing.T) {
+	c := New()
+
+	rec := dnstest.NewRecorder(&test.ResponseWriter{})
+	cw := &ResponseWriter{ResponseWriter: rec, Cache: c}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ResponseWriter.WriteMsg panicked on nil response: %v", r)
+		}
+	}()
+
+	err := cw.WriteMsg(nil)
+	if err == nil {
+		t.Error("Expected error when passing nil response to WriteMsg, got nil")
+	}
+}
+
+func TestKeyEmptyQuestion(t *testing.T) {
+	// A response with an empty question section must be reported as
+	// non-cacheable instead of panicking on m.Question[0]. Some plugins can
+	// emit such a message (e.g. during prefetch). Regression test for #6051.
+	m := new(dns.Msg)
+	m.Response = true
+	m.Rcode = dns.RcodeSuccess
+
+	if ok, _ := key("example.org.", m, response.NoError, false, false); ok {
+		t.Fatal("expected a response with an empty question section to be non-cacheable")
 	}
 }

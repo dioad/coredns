@@ -11,7 +11,7 @@ import (
 	mcs "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func ptrTo[T any](v T) *T { return &v }
+//go:fix inline
 
 // dump renders an object for a failure message. %+v prints an aliased pointer field as
 // an address, which hides the value that actually differs, so render as JSON instead.
@@ -55,7 +55,7 @@ func deepCopyCases() []struct {
 	}{
 		{"Pod", &Pod{
 			Version:   "1",
-			PodIP:     "10.244.0.1",
+			PodIPs:    []string{"10.244.0.1", "fd00::1"},
 			Name:      "pod1",
 			Namespace: "testns",
 			Labels:    map[string]string{"app": "nginx", "tier": "frontend"},
@@ -76,7 +76,7 @@ func deepCopyCases() []struct {
 			Ports: []api.ServicePort{{
 				Name: "http", Protocol: api.ProtocolTCP, Port: 80,
 				// A pointer field, so a slice copy alone leaves it shared.
-				AppProtocol: ptrTo("kubernetes.io/h2c"),
+				AppProtocol: new("kubernetes.io/h2c"),
 			}},
 			ExternalIPs: []string{"1.2.3.4"},
 		}},
@@ -89,7 +89,7 @@ func deepCopyCases() []struct {
 			Type:       mcs.ClusterSetIP,
 			Ports: []mcs.ServicePort{{
 				Name: "http", Protocol: api.ProtocolTCP, Port: 80,
-				AppProtocol: ptrTo("kubernetes.io/h2c"),
+				AppProtocol: new("kubernetes.io/h2c"),
 			}},
 		}},
 		{"Namespace", &Namespace{Version: "1", Name: "testns"}},
@@ -196,7 +196,7 @@ func TestDeepCopyObjectIsDeep(t *testing.T) {
 // Nil maps and slices must stay nil rather than becoming empty, so a round trip does
 // not change how a value compares.
 func TestDeepCopyObjectPreservesNilLabels(t *testing.T) {
-	pod := &Pod{Version: "1", PodIP: "10.244.0.1", Name: "pod1", Namespace: "testns"}
+	pod := &Pod{Version: "1", PodIPs: []string{"10.244.0.1"}, Name: "pod1", Namespace: "testns"}
 	cp := pod.DeepCopyObject().(*Pod)
 	if cp.Labels != nil {
 		t.Errorf("nil Labels became %#v after a round trip", cp.Labels)

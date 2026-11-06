@@ -1,13 +1,28 @@
 package file
 
 import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/coredns/caddy"
+	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/pkg/fall"
 	"github.com/coredns/coredns/plugin/test"
+
+	"github.com/miekg/dns"
 )
+
+const dbRelative = `@ 500 IN SOA ns.example. hostmaster.example. 3 3600 600 86400 300
+@ 500 IN NS ns.example.
+foo 500 IN A 192.0.2.1
+`
 
 func TestFileParse(t *testing.T) {
 	zoneFileName1, rm, err := test.TempFile(".", dbMiekNL)
@@ -17,6 +32,12 @@ func TestFileParse(t *testing.T) {
 	defer rm()
 
 	zoneFileName2, rm, err := test.TempFile(".", dbDnssexNLSigned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rm()
+
+	zoneFileName3, rm, err := test.TempFile(".", dbRelative)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,13 +62,13 @@ func TestFileParse(t *testing.T) {
 			fall.Zero,
 		},
 		{
-			`file ` + zoneFileName2 + ` 10.0.0.0/8`,
+			`file ` + zoneFileName3 + ` 10.0.0.0/8`,
 			false,
 			Zones{Names: []string{"10.in-addr.arpa."}},
 			fall.Zero,
 		},
 		{
-			`file ` + zoneFileName2 + ` example.org. {
+			`file ` + zoneFileName3 + ` example.org. {
 					fallthrough
 				}`,
 			false,
@@ -55,7 +76,7 @@ func TestFileParse(t *testing.T) {
 			fall.Root,
 		},
 		{
-			`file ` + zoneFileName2 + ` example.org. {
+			`file ` + zoneFileName3 + ` example.org. {
 					fallthrough www.example.org
 				}`,
 			false,
@@ -78,7 +99,7 @@ func TestFileParse(t *testing.T) {
 			fall.Zero,
 		},
 		{
-			`file ` + zoneFileName1 + ` example.net. {
+			`file ` + zoneFileName3 + ` example.net. {
 				no_reload
 			}`,
 			true,
@@ -86,7 +107,7 @@ func TestFileParse(t *testing.T) {
 			fall.Zero,
 		},
 		{
-			`file ` + zoneFileName1 + ` example.net. {
+			`file ` + zoneFileName3 + ` example.net. {
 				no_rebloat
 			}`,
 			true,
@@ -120,7 +141,7 @@ func TestFileParse(t *testing.T) {
 }
 
 func TestParseReload(t *testing.T) {
-	name, rm, err := test.TempFile(".", dbMiekNL)
+	name, rm, err := test.TempFile(".", dbRelative)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,9 +165,215 @@ func TestParseReload(t *testing.T) {
 
 	for i, test := range tests {
 		c := caddy.NewTestController("dns", test.input)
-		z, _, _ := fileParse(c)
+		z, _, err := fileParse(c)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if x := z.Z["example.org."].ReloadInterval; x != test.reload {
 			t.Errorf("Test %d expected reload to be %s, but got %s", i, test.reload, x)
 		}
+	}
+}
+
+func TestFileParseSOAOrigin(t *testing.T) {
+	for _, owner := range []string{"test", "@", "test."} {
+		for _, explicit := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/explicit=%t", owner, explicit), func(t *testing.T) {
+				contents := fmt.Sprintf(`%s 500 IN SOA ns1.outside.com. root.test 3 604800 86400 2419200 604800
+%s 500 IN NS ns1.outside.com.
+foo 500 IN A 1.1.1.1
+`, owner, owner)
+				fileName := filepath.Join(t.TempDir(), "db.test")
+				if err := os.WriteFile(fileName, []byte(contents), 0644); err != nil {
+					t.Fatal(err)
+				}
+				corefile := fmt.Sprintf("file %q", filepath.ToSlash(fileName))
+				if explicit {
+					corefile += " test"
+				}
+				c := caddy.NewTestController("dns", corefile)
+				c.ServerBlockKeys = []string{"test:53"}
+				zones, _, err := fileParse(c)
+				if owner == "test" {
+					if err == nil || !strings.Contains(err.Error(), "SOA owner test.test. that does not match origin test.") {
+						t.Fatalf("expected mismatched SOA error, got %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				f := File{Zones: zones}
+				for _, tc := range []test.Case{
+					{
+						Qname: "foo.test.", Qtype: dns.TypeA, Authoritative: true,
+						Answer: []dns.RR{test.A("foo.test. 500 IN A 1.1.1.1")},
+						Ns:     []dns.RR{test.NS("test. 500 IN NS ns1.outside.com.")},
+					},
+					{
+						Qname: "bar.test.", Qtype: dns.TypeA, Rcode: dns.RcodeNameError, Authoritative: true,
+						Ns: []dns.RR{test.SOA("test. 500 IN SOA ns1.outside.com. root.test.test. 3 604800 86400 2419200 604800")},
+					},
+				} {
+					rec := dnstest.NewRecorder(&test.ResponseWriter{})
+					if _, err := f.ServeDNS(context.Background(), rec, tc.Msg()); err != nil {
+						t.Fatal(err)
+					}
+					if err := test.SortAndCheck(rec.Msg, tc); err != nil {
+						t.Error(err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestFileParseRelativeZones(t *testing.T) {
+	fileName, rm, err := test.TempFile(".", dbRelative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rm()
+	c := caddy.NewTestController("dns", "file "+fileName+" example.org example.net")
+	zones, _, err := fileParse(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, origin := range []string{"example.org.", "example.net."} {
+		z := zones.Z[origin]
+		if z == nil || z.SOA == nil || z.SOA.Hdr.Name != origin {
+			t.Fatalf("missing SOA at %s", origin)
+		}
+		if _, ok := z.Search("foo." + origin); !ok {
+			t.Errorf("missing relative A record in %s", origin)
+		}
+	}
+}
+
+func TestFileParseReloadByMtimeInitializesMtime(t *testing.T) {
+	name, rm, err := test.TempFile(".", dbMiekNL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rm()
+
+	c := caddy.NewTestController("dns", "file "+name+" miek.nl. {\n\treload_by_mtime\n}")
+	zones, _, err := fileParse(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fi, err := os.Stat(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := zones.Z["miek.nl."]
+	if z.file_mtime.IsZero() {
+		t.Fatal("file mtime was not initialized for reload_by_mtime")
+	}
+	if !z.file_mtime.Equal(fi.ModTime()) {
+		t.Fatalf("file mtime = %s, want %s", z.file_mtime, fi.ModTime())
+	}
+}
+
+func TestFileParseReloadByMtimeMissingFileLeavesBaselineUnset(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "missing.db")
+	c := caddy.NewTestController("dns", "file "+name+" example.org. {\n\treload_by_mtime\n}")
+	zones, _, err := fileParse(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !zones.Z["example.org."].file_mtime.IsZero() {
+		t.Fatal("missing initial file must leave the mtime baseline unset")
+	}
+}
+
+func TestFileParseReloadByMtimeRecoversLaterZoneAfterMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "missing.db")
+	existing := filepath.Join(dir, "existing.db")
+	if err := os.WriteFile(existing, []byte(dbMiekNL), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	corefile := fmt.Sprintf(`file %s example.org. {
+	reload 10ms
+	reload_by_mtime
+}
+file %s miek.nl. {
+	reload 10ms
+	reload_by_mtime
+}`, missing, existing)
+	zones, _, err := fileParse(caddy.NewTestController("dns", corefile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := zones.Z["miek.nl."]
+	if z == nil {
+		t.Fatal("later zone was not configured")
+	}
+	if err := z.Reload(nil); err != nil {
+		t.Fatal(err)
+	}
+	defer z.OnShutdown()
+
+	const wantSerial = 1282630057
+	for start := time.Now(); time.Since(start) < 2*time.Second; {
+		if z.SOASerialIfDefined() == wantSerial {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatalf("later zone never loaded: SOA serial = %d, want %d", z.SOASerialIfDefined(), wantSerial)
+}
+
+func TestFileParseReloadByMtimeUsesOpenedFileMtime(t *testing.T) {
+	name, rm, err := test.TempFile(".", dbRelative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rm()
+
+	initialMtime := time.Now().Add(-2 * time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(name, initialMtime, initialMtime); err != nil {
+		t.Fatal(err)
+	}
+
+	c := caddy.NewTestController("dns", "file "+name+" example.org. {\n\treload_by_mtime\n}")
+	zones, _, err := fileParseWithParser(c, func(reader io.Reader, origin, fileName string, serial int64) (*Zone, error) {
+		// Simulate the opened reader consuming the old zone before a writer
+		// replaces its contents while the initial load is still in progress.
+		oldContents, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+		newContents := strings.Replace(dbRelative, "192.0.2.1", "192.0.2.2", 1)
+		if err := os.WriteFile(fileName, []byte(newContents), 0644); err != nil {
+			return nil, err
+		}
+		newMtime := initialMtime.Add(time.Hour)
+		if err := os.Chtimes(fileName, newMtime, newMtime); err != nil {
+			return nil, err
+		}
+		return Parse(bytes.NewReader(oldContents), origin, fileName, serial)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	z := zones.Z["example.org."]
+	entry, ok := z.Search("foo.example.org.")
+	if !ok || len(entry.Type(dns.TypeA)) != 1 || entry.Type(dns.TypeA)[0].(*dns.A).A.String() != "192.0.2.1" {
+		t.Fatal("initial load did not retain the old zone record")
+	}
+	if !z.file_mtime.Equal(initialMtime) {
+		t.Fatalf("initial mtime = %s, want opened file's %s", z.file_mtime, initialMtime)
+	}
+	fi, err := os.Stat(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fi.ModTime().After(z.file_mtime) {
+		t.Fatalf("changed zone mtime %s must be newer than loaded baseline %s", fi.ModTime(), z.file_mtime)
 	}
 }
