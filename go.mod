@@ -18,7 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.2
 	github.com/caddyserver/certmagic v0.25.6
 	github.com/coredns/caddy v1.1.4
-	github.com/dioad/coredns-dioadconnect v0.15.4
+	github.com/dioad/coredns-dioadconnect v0.15.5
 	github.com/dnstap/golang-dnstap v0.4.0
 	github.com/expr-lang/expr v1.17.8
 	github.com/farsightsec/golang-framestream v0.3.0
@@ -111,7 +111,7 @@ require (
 	github.com/dioad/auth v0.14.5 // indirect
 	github.com/dioad/connect-control v0.51.2 // indirect
 	github.com/dioad/generics v0.0.9 // indirect
-	github.com/dioad/net v0.71.2 // indirect
+	github.com/dioad/net v0.71.3 // indirect
 	github.com/dioad/util v0.7.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
