@@ -142,8 +142,8 @@ github.com/dioad/coredns-dioadconnect v0.15.5 h1:fG+w4jPyjPsl05B6mL9S/N2Yeg/h8cW
 github.com/dioad/coredns-dioadconnect v0.15.5/go.mod h1:dbRFbUyOTT+umrokHoMW57V5xOsoDwfKB0Uyfp5UtNA=
 github.com/dioad/generics v0.0.9 h1:886ArS3vNm+c6usRuQmEhhyqxVLbJSdM5NMPnM49Ya8=
 github.com/dioad/generics v0.0.9/go.mod h1:NFn4N/41m2Ln8xjKm6c9ieZQeKohyCEg0RfQg34aVRg=
-github.com/dioad/net v0.71.3 h1:5VnhA4sBNxbsN+Bv88Eua8yD8vqU8hayVrFWzEm37/w=
-github.com/dioad/net v0.71.3/go.mod h1:Kf5lCkJSZsFdMp3TK7Jhx2XcJCWX9cBUC7kiV4ue3Fk=
+github.com/dioad/net v0.71.4 h1:o6yg3vOuQrEmtIzLaa1hPSXlWgQ08Hs9TxfMrXC1iqo=
+github.com/dioad/net v0.71.4/go.mod h1:Kf5lCkJSZsFdMp3TK7Jhx2XcJCWX9cBUC7kiV4ue3Fk=
 github.com/dioad/util v0.7.0 h1:DdSits6ZE/m6FSkSHLrPFehJJT7VlDGxxHkiZQ4xzaQ=
 github.com/dioad/util v0.7.0/go.mod h1:FqqqoXSEV4Mh2DEYzw4rsWReDvyykQItBgrsj6w14FY=
 github.com/dnstap/golang-dnstap v0.4.0 h1:KRHBoURygdGtBjDI2w4HifJfMAhhOqDuktAokaSa234=
