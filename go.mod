@@ -111,7 +111,7 @@ require (
 	github.com/dioad/auth v0.14.5 // indirect
 	github.com/dioad/connect-control v0.51.2 // indirect
 	github.com/dioad/generics v0.0.9 // indirect
-	github.com/dioad/net v0.71.3 // indirect
+	github.com/dioad/net v0.71.4 // indirect
 	github.com/dioad/util v0.7.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
