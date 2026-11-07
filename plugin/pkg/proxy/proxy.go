@@ -146,9 +146,13 @@ func (p *Proxy) Down(maxfails uint32) bool {
 	return fails > maxfails
 }
 
-// Stop stops health checking and closes the DoQ transport, when configured.
+// Stop stops health checking and signals the underlying transport to stop,
+// closing the DoQ transport too when configured.
+// Cached connections are closed asynchronously during transport cleanup.
+// It is safe to call multiple times.
 func (p *Proxy) Stop() {
 	p.probe.Stop()
+	p.transport.Stop()
 	if p.doq != nil {
 		p.doq.stopTransport()
 	}
