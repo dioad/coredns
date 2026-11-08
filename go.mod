@@ -18,7 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.2
 	github.com/caddyserver/certmagic v0.25.6
 	github.com/coredns/caddy v1.1.4
-	github.com/dioad/coredns-dioadconnect v0.15.6
+	github.com/dioad/coredns-dioadconnect v0.15.7
 	github.com/dnstap/golang-dnstap v0.4.0
 	github.com/expr-lang/expr v1.17.8
 	github.com/farsightsec/golang-framestream v0.3.0
@@ -108,7 +108,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/dioad/auth v0.14.5 // indirect
+	github.com/dioad/auth v0.14.6 // indirect
 	github.com/dioad/connect-control v0.51.2 // indirect
 	github.com/dioad/generics v0.0.9 // indirect
 	github.com/dioad/net v0.71.4 // indirect
